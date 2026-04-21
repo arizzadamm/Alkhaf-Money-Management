@@ -27,7 +27,7 @@ function App() {
   const [baseTotalIncome, setBaseTotalIncome] = useState(0);
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [goals, setGoals] = useState([]); // NEW STATE FOR GOALS
+  const [goals, setGoals] = useState([]); 
   const [transactions, setTransactions] = useState([]); 
   
   // UI STATE
@@ -50,15 +50,26 @@ function App() {
   }, [monthOffset]);
 
   const viewMonthName = getReferenceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  
+  // Create YYYY-MM format for the currently selected Budget Month
+  const activeBudgetMonth = useMemo(() => {
+    const year = getReferenceDate.getFullYear();
+    const month = String(getReferenceDate.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }, [getReferenceDate]);
 
   const timelineMonths = useMemo(() => {
     const result = [];
     const d = new Date();
     for (let i = -4; i <= 1; i++) {
       const monthDate = new Date(d.getFullYear(), d.getMonth() + i, 1);
+      const year = monthDate.getFullYear();
+      const monthStr = String(monthDate.getMonth() + 1).padStart(2, '0');
+      
       result.push({
         label: monthDate.toLocaleString('en-US', { month: 'short' }),
-        offset: i
+        offset: i,
+        budgetMonthValue: `${year}-${monthStr}` // e.g. '2026-05'
       });
     }
     return result;
@@ -122,20 +133,32 @@ function App() {
       setBaseTotalIncome(data.total_income);
       setAccounts(data.accounts || []);
       setCategories(data.categories || []);
-      setGoals(data.goals || []); // LOAD GOALS
+      setGoals(data.goals || []); 
     }
   };
 
   const fetchTransactions = async () => {
-    const startOfMonth = new Date(getReferenceDate.getFullYear(), getReferenceDate.getMonth(), 1).toISOString();
-    const endOfMonth = new Date(getReferenceDate.getFullYear(), getReferenceDate.getMonth() + 1, 0, 23, 59, 59).toISOString();
-
-    const { data, error } = await supabase
+    // Attempt to fetch using the new budget_month column
+    let { data, error } = await supabase
       .from('expenses')
       .select('*')
-      .gte('created_at', startOfMonth)
-      .lte('created_at', endOfMonth)
+      .eq('budget_month', activeBudgetMonth)
       .order('created_at', { ascending: false });
+
+    // FALLBACK: If column doesn't exist yet (prevent crash before SQL migration)
+    if (error && error.message.includes('budget_month')) {
+      const startOfMonth = new Date(getReferenceDate.getFullYear(), getReferenceDate.getMonth(), 1).toISOString();
+      const endOfMonth = new Date(getReferenceDate.getFullYear(), getReferenceDate.getMonth() + 1, 0, 23, 59, 59).toISOString();
+      const fallback = await supabase
+        .from('expenses')
+        .select('*')
+        .gte('created_at', startOfMonth)
+        .lte('created_at', endOfMonth)
+        .order('created_at', { ascending: false });
+      
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (data) {
       const mapped = data.map(d => ({
@@ -187,18 +210,31 @@ function App() {
     await supabase.from('expenses').update({ is_paid: !currentStatus }).eq('id', id);
   };
 
+  const executeInsertWithFallback = async (newRows) => {
+    const res = await supabase.from('expenses').insert(newRows);
+    if (res.error && res.error.message.includes('budget_month')) {
+       // Fallback for seamless experience before SQL migration
+       const fallbackRows = newRows.map(r => {
+         const { budget_month, ...rest } = r;
+         return rest;
+       });
+       await supabase.from('expenses').insert(fallbackRows);
+    }
+  };
+
   const addExpense = async (e) => {
     e.preventDefault();
     const name = e.target.name.value;
     const amount = Number(e.target.amount.value);
     const account = e.target.account.value;
     const category = e.target.category.value;
+    const budgetMonth = e.target.budget_month.value;
     const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     
     if (name && amount) {
-      const newExp = { name, amount, account, category, is_paid: false, date };
+      const newExp = { name, amount, account, category, is_paid: false, date, budget_month: budgetMonth };
       setIsAddOpen(false);
-      await supabase.from('expenses').insert([newExp]);
+      await executeInsertWithFallback([newExp]);
     }
   };
 
@@ -207,12 +243,13 @@ function App() {
     const name = e.target.name.value;
     const amount = Number(e.target.amount.value);
     const account = e.target.account.value;
+    const budgetMonth = e.target.budget_month.value;
     const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     
     if (name && amount) {
-      const newIncome = { name, amount, account, category: 'Income', is_paid: true, date };
+      const newIncome = { name, amount, account, category: 'Income', is_paid: true, date, budget_month: budgetMonth };
       setIsTopUpOpen(false);
-      await supabase.from('expenses').insert([newIncome]);
+      await executeInsertWithFallback([newIncome]);
     }
   };
 
@@ -221,6 +258,7 @@ function App() {
     const fromAcc = e.target.fromAcc.value;
     const toAcc = e.target.toAcc.value;
     const amount = Number(e.target.amount.value);
+    const budgetMonth = e.target.budget_month.value;
     const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     if (fromAcc === toAcc) {
@@ -229,11 +267,11 @@ function App() {
     }
 
     if (amount > 0) {
-      const transferOut = { name: `Transfer to ${toAcc}`, amount, account: fromAcc, category: 'Transfer Out', is_paid: true, date };
-      const transferIn = { name: `Transfer from ${fromAcc}`, amount, account: toAcc, category: 'Transfer In', is_paid: true, date };
+      const transferOut = { name: `Transfer to ${toAcc}`, amount, account: fromAcc, category: 'Transfer Out', is_paid: true, date, budget_month: budgetMonth };
+      const transferIn = { name: `Transfer from ${fromAcc}`, amount, account: toAcc, category: 'Transfer In', is_paid: true, date, budget_month: budgetMonth };
       
       setIsTransferOpen(false);
-      await supabase.from('expenses').insert([transferOut, transferIn]);
+      await executeInsertWithFallback([transferOut, transferIn]);
     }
   };
 
@@ -249,11 +287,10 @@ function App() {
       total_income: baseTotalIncome, 
       accounts: accounts,
       categories: categories,
-      goals: goals // SAVE GOALS
+      goals: goals 
     });
   };
 
-  // GOAL HELPER
   const quickAddGoalFund = (goalId, amountToAdd) => {
     const amount = parseFloat(prompt('Berapa nominal (IDR) yang ingin ditambahkan ke tabungan impian ini?', amountToAdd || '0'));
     if (!isNaN(amount) && amount > 0) {
@@ -264,7 +301,6 @@ function App() {
         return g;
       });
       setGoals(updatedGoals);
-      // Auto-save setting to supabase silently
       supabase.from('app_settings').upsert({
         id: 1, 
         total_income: baseTotalIncome, 
@@ -281,7 +317,7 @@ function App() {
       return;
     }
     
-    const headers = ['ID', 'Date', 'Transaction Name', 'Amount (IDR)', 'Account', 'Category', 'Type', 'Status'];
+    const headers = ['ID', 'Date', 'Transaction Name', 'Amount (IDR)', 'Account', 'Category', 'Type', 'Status', 'Budget Month'];
     const csvRows = [headers.join(',')];
     
     transactions.forEach(tx => {
@@ -293,6 +329,7 @@ function App() {
       const name = `"${tx.name.replace(/"/g, '""')}"`;
       const account = `"${tx.account}"`;
       const category = `"${tx.category}"`;
+      const bm = tx.budget_month || '';
       
       const row = [
         tx.id,
@@ -302,7 +339,8 @@ function App() {
         account,
         category,
         type,
-        status
+        status,
+        bm
       ];
       csvRows.push(row.join(','));
     });
@@ -608,7 +646,7 @@ function App() {
                  <p style={{opacity:0.8}}>Total Pool: {formatIDR(effectiveTotalIncome)} (Base: {formatIDR(baseTotalIncome)} + Top Up: {formatIDR(totals.totalDynamicIncome)})</p>
                </div>
                
-               <div style={{display:'flex', gap:'1rem'}}>
+               <div style={{display:'flex', gap:'1rem', flexWrap:'wrap'}}>
                  {timelineMonths.map((item, i) => {
                     const isCurrent = item.offset === monthOffset;
                     return (
@@ -962,6 +1000,12 @@ function App() {
             </div>
             <form onSubmit={addExpense}>
               <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Budget Month (Alokasi Kantong)</label>
+                <select name="budget_month" className="form-input" required defaultValue={activeBudgetMonth}>
+                  {timelineMonths.map(m => <option key={m.budgetMonthValue} value={m.budgetMonthValue}>{m.label} ({m.budgetMonthValue})</option>)}
+                </select>
+              </div>
+              <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Expense Name</label>
                 <input type="text" name="name" className="form-input" placeholder="e.g. Internet Bill" required />
               </div>
@@ -999,6 +1043,12 @@ function App() {
             </div>
             <form onSubmit={addTopUp}>
               <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Budget Month (Gaji Kantong Bulan Apa?)</label>
+                <select name="budget_month" className="form-input" required defaultValue={activeBudgetMonth}>
+                  {timelineMonths.map(m => <option key={m.budgetMonthValue} value={m.budgetMonthValue}>{m.label} ({m.budgetMonthValue})</option>)}
+                </select>
+              </div>
+              <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Income Source Name</label>
                 <input type="text" name="name" className="form-input" placeholder="e.g. Bonus Bulanan, Jualan" required />
               </div>
@@ -1029,6 +1079,12 @@ function App() {
               <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsTransferOpen(false)}><X size={24}/></button>
             </div>
             <form onSubmit={addTransfer}>
+              <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Budget Month</label>
+                <select name="budget_month" className="form-input" required defaultValue={activeBudgetMonth}>
+                  {timelineMonths.map(m => <option key={m.budgetMonthValue} value={m.budgetMonthValue}>{m.label} ({m.budgetMonthValue})</option>)}
+                </select>
+              </div>
               <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Amount (IDR)</label>
                 <input type="number" name="amount" className="form-input" placeholder="0" required />
