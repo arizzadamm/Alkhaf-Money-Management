@@ -1,24 +1,28 @@
 :root {
+  /* ========================================= */
+  /* TEMA DESKTOP (TAMPILAN LAMA YANG KLASIK)  */
+  /* ========================================= */
   --bg-main: #f8fafc;
   --bg-card: #ffffff;
   --bg-sidebar: #ffffff;
-  --bg-input: #f3f4f6;
-  --border-color: #e5e7eb;
-  --hover-bg: rgba(0,0,0,0.03);
+  --bg-input: #f1f5f9;
   
-  --text-primary: #0f172a;
+  --text-primary: #1e293b;
   --text-secondary: #64748b;
-  --text-inverse: #ffffff;
+  
+  --border-color: #e2e8f0;
+  --hover-bg: #f8fafc;
   
   --accent-lime: #d2f411;
   --accent-dark-green: #213f31;
   --accent-blue-gray: #2d5866;
-  --danger: #ef4444;
-  --danger-light: #fef2f2;
-  --success: #10b981;
   
-  --border-radius-lg: 24px;
-  --border-radius-md: 16px;
+  --success: #10b981;
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+  
+  --border-radius-lg: 20px;
+  --border-radius-md: 12px;
 }
 
 [data-theme="dark"] {
@@ -26,19 +30,34 @@
   --bg-card: #1e293b;
   --bg-sidebar: #1e293b;
   --bg-input: #334155;
-  --border-color: #334155;
-  --hover-bg: rgba(255,255,255,0.05);
   
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-  --text-inverse: #0f172a;
+  
+  --border-color: #334155;
+  --hover-bg: #334155;
   
   --accent-lime: #d2f411;
-  --accent-dark-green: #152b22;
-  --accent-blue-gray: #3a7587;
-  --danger: #f87171;
-  --danger-light: rgba(239, 68, 68, 0.2);
+  --accent-dark-green: #3a7587;
+  --accent-blue-gray: #64748b;
+  
   --success: #34d399;
+  --danger: #f87171;
+  --danger-light: rgba(239, 68, 68, 0.1);
+}
+
+@media (max-width: 768px) {
+  /* ========================================= */
+  /* TEMA MOBILE (TAMPILAN BARU SESUAI MOCKUP) */
+  /* ========================================= */
+  :root {
+    --bg-main: #f5f6f1; /* Cream */
+    --accent-lime: #c7e436;
+    --accent-dark-green: #1a3628;
+    --accent-blue-gray: #334155;
+    --border-radius-lg: 24px;
+    --border-radius-md: 16px;
+  }
 }
 
 * {
@@ -48,14 +67,8 @@
 }
 
 body {
-  font-family: 'Outfit', -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-main);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.custom-checkbox::before {
-  box-shadow: inset 1em 1em var(--bg-card);
-  background-color: var(--bg-card);
 }
