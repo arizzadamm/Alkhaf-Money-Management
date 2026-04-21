@@ -1,0 +1,61 @@
+:root {
+  --bg-main: #f3f3eb; /* Cream background */
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  
+  --accent-lime: #d2f411;
+  --accent-dark-green: #213f31;
+  --accent-blue-gray: #2d5866;
+  
+  --success: #16a34a;
+  --danger: #dc2626;
+  
+  --border-radius-sm: 12px;
+  --border-radius-md: 20px;
+  --border-radius-lg: 32px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--bg-main); 
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  background-color: var(--bg-main);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+input, select, button {
+  font-family: inherit;
+}
