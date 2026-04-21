@@ -34,6 +34,7 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [goals, setGoals] = useState([]); 
   const [transactions, setTransactions] = useState([]); 
+  const [globalTransactions, setGlobalTransactions] = useState([]);
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
@@ -104,11 +105,13 @@ function App() {
       setIsLoading(true);
       fetchSettings();
       fetchTransactions(); 
+      fetchGlobalTransactions();
 
       const txSub = supabase
         .channel('public:expenses')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, (payload) => {
           fetchTransactions();
+          fetchGlobalTransactions();
         })
         .subscribe();
 
@@ -164,6 +167,11 @@ function App() {
     setIsLoading(false);
   };
 
+  const fetchGlobalTransactions = async () => {
+    const { data } = await supabase.from('expenses').select('amount, category, account, is_paid');
+    if (data) setGlobalTransactions(data);
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
@@ -213,7 +221,7 @@ function App() {
     
     if (name && amount) {
       setIsAddOpen(false);
-      await executeInsertWithFallback([{ name, amount, account, category, is_paid: false, date, budget_month: budgetMonth }]);
+      await executeInsertWithFallback([{ name, amount, account, category, is_paid: true, date, budget_month: budgetMonth }]);
     }
   };
 
@@ -312,14 +320,14 @@ function App() {
   const currentAccountBalances = useMemo(() => {
     const current = {};
     accounts.forEach(a => current[a.name] = Number(a.balance));
-    transactions.forEach(tx => {
+    globalTransactions.forEach(tx => {
       if(current[tx.account] !== undefined) {
         if (tx.category === 'Income' || tx.category === 'Transfer In') current[tx.account] += Number(tx.amount);
-        else if (tx.isPaid) current[tx.account] -= Number(tx.amount);
+        else if (tx.is_paid) current[tx.account] -= Number(tx.amount);
       }
     });
     return current;
-  }, [transactions, accounts]);
+  }, [globalTransactions, accounts]);
 
   const nonAllocated = effectiveTotalIncome - totals.allocated;
   const sumOfAccounts = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
@@ -383,7 +391,7 @@ function App() {
             <Bell size={18} color="var(--text-secondary)" style={{cursor:'pointer'}} />
           </div>
           <div className="total-balance">
-            <div className="total-balance-label">Total Balance (Mock)</div>
+            <div className="total-balance-label">Total Balance</div>
             <div className="total-balance-value">{formatIDR(totalBalance)}</div>
           </div>
           <button className="btn-lime"><QrCode size={20} /> Scan QR</button>
