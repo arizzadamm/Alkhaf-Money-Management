@@ -27,7 +27,7 @@
 }
 
 .login-card {
-  background: white;
+  background: var(--bg-card);
   padding: 3rem;
   border-radius: var(--border-radius-lg);
   box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
@@ -48,6 +48,7 @@
   font-weight: 800;
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
+  color: #0f172a;
 }
 
 /* SIDEBAR */
@@ -83,6 +84,7 @@
   place-content: center;
   font-size: 0.9rem;
   font-weight: 800;
+  color: #0f172a;
 }
 
 .nav-links {
@@ -110,7 +112,7 @@
 }
 
 .nav-item:not(.active):hover {
-  background-color: rgba(0,0,0,0.03);
+  background-color: var(--hover-bg);
   color: var(--text-primary);
 }
 
@@ -129,7 +131,7 @@
 .profile-avatar {
   width: 40px;
   height: 40px;
-  background-color: #e5e7eb;
+  background-color: var(--border-color);
   border-radius: 50%;
   overflow: hidden;
 }
@@ -171,7 +173,7 @@
 
 .btn-lime {
   background-color: var(--accent-lime);
-  color: var(--text-primary);
+  color: #0f172a;
   border: none;
   border-radius: 99px;
   padding: 1rem;
@@ -209,7 +211,7 @@
 }
 
 .search-bar {
-  background: white;
+  background: var(--bg-card);
   padding: 0.75rem 1.5rem;
   border-radius: 99px;
   display: flex;
@@ -223,6 +225,7 @@
   outline: none;
   background: transparent;
   width: 100%;
+  color: var(--text-primary);
 }
 
 /* WIDGETS LAYOUT */
@@ -267,6 +270,10 @@
   gap: 1rem;
   overflow-x: auto;
   padding-bottom: 0.5rem;
+  scrollbar-width: none; /* Firefox */
+}
+.cards-container::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .bank-card {
@@ -282,7 +289,7 @@
   overflow: hidden;
 }
 
-.bank-card.color-0 { background-color: var(--accent-lime); color: var(--text-primary); }
+.bank-card.color-0 { background-color: var(--accent-lime); color: #0f172a; }
 .bank-card.color-1 { background-color: var(--accent-dark-green); }
 .bank-card.color-2 { background-color: var(--accent-blue-gray); }
 .bank-card.color-3 { background-color: #eab308; }
@@ -346,6 +353,7 @@
   transition: transform 0.2s;
   font-weight: 500;
   font-size: 0.9rem;
+  color: var(--text-primary);
 }
 
 .action-btn:hover {
@@ -355,7 +363,7 @@
 .action-icon {
   width: 40px;
   height: 40px;
-  background-color: white;
+  background-color: var(--bg-card);
   border-radius: 50%;
   display: grid;
   place-content: center;
@@ -453,7 +461,7 @@
   vertical-align: middle;
 }
 
-/* MODAL / SETTINGS overrides for light theme */
+/* MODAL / SETTINGS */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -467,7 +475,7 @@
 }
 
 .modal-content {
-  background: white;
+  background: var(--bg-card);
   border-radius: var(--border-radius-lg);
   width: 100%;
   max-width: 600px;
@@ -480,7 +488,7 @@
 .form-input {
   width: 100%;
   padding: 0.75rem 1rem;
-  background: var(--bg-main);
+  background: var(--bg-input);
   border: 1px solid transparent;
   border-radius: 8px;
   color: var(--text-primary);
@@ -497,7 +505,7 @@
   display: flex;
   gap: 1rem;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .tab {
@@ -514,7 +522,7 @@
 }
 
 .btn-danger {
-  background: #fef2f2;
+  background: var(--danger-light);
   color: var(--danger);
   border: none;
   padding: 0.5rem;
@@ -544,12 +552,12 @@
   opacity: 0.9;
 }
 
-/* Custom Checkbox Light */
+/* Custom Checkbox */
 .custom-checkbox {
   appearance: none;
   width: 24px;
   height: 24px;
-  border: 2px solid #d1d5db;
+  border: 2px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   display: grid;
@@ -563,8 +571,6 @@
   height: 12px;
   transform: scale(0);
   transition: 120ms transform ease-in-out;
-  box-shadow: inset 1em 1em white;
-  background-color: white;
   transform-origin: center;
   clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
 }
@@ -576,4 +582,122 @@
 
 .custom-checkbox:checked::before {
   transform: scale(1);
+}
+
+/* RESPONSIVE DESIGN FOR MOBILE */
+@media (max-width: 768px) {
+  .app-layout {
+    flex-direction: column;
+  }
+  
+  /* Convert Sidebar into Bottom Navigation */
+  .sidebar {
+    order: 2;
+    width: 100%;
+    height: 70px;
+    padding: 0.5rem 1rem;
+    border-radius: 0;
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.05);
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 50;
+  }
+  
+  .logo, .sidebar-bottom {
+    display: none;
+  }
+  
+  .nav-links {
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    gap: 0;
+  }
+  
+  .nav-item {
+    padding: 0.5rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    border-radius: 12px;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .nav-item.active {
+    background-color: transparent;
+    color: var(--accent-dark-green);
+  }
+  
+  /* Main Content Adjustments */
+  .main-content {
+    order: 1;
+    height: calc(100vh - 70px);
+    padding: 1.5rem 1rem;
+  }
+  
+  .top-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .top-bar > div:last-child {
+    justify-content: space-between;
+    width: 100%;
+  }
+  
+  .search-bar {
+    width: auto;
+    flex: 1;
+  }
+  
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Actions Grid compact for mobile */
+  .actions-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .action-btn {
+    padding: 0.75rem 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  /* Make tables scrollable */
+  .full-transactions-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Bottom Sheet Style Modals */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  
+  .modal-content {
+    border-radius: 24px 24px 0 0;
+    padding: 1.5rem;
+    padding-bottom: 2.5rem;
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  /* Login Screen Adjustments */
+  .login-card {
+    margin: 1.5rem;
+    padding: 2rem;
+  }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }

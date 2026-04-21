@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, RefreshCw, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft } from 'lucide-react';
+import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, RefreshCw, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from './supabaseClient';
 import './App.css';
@@ -37,8 +37,9 @@ function App() {
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   
   // NEW FEATURES STATE
-  const [monthOffset, setMonthOffset] = useState(0); // 0 = current month, -1 = last month, etc.
+  const [monthOffset, setMonthOffset] = useState(0); 
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
   // HELPERS FOR MONTH FILTERING
   const getReferenceDate = useMemo(() => {
@@ -50,7 +51,6 @@ function App() {
   const viewMonthName = getReferenceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
   const viewMonthShort = getReferenceDate.toLocaleString('en-US', { month: 'short' });
 
-  // Generate a dynamic 6-month timeline array ending with +1 month relative to CURRENT real-time date
   const timelineMonths = useMemo(() => {
     const result = [];
     const d = new Date();
@@ -64,20 +64,36 @@ function App() {
     return result;
   }, []);
 
-  // CHECK EXISTING SESSION ON MOUNT
+  // INIT SESSION & DARK MODE
   useEffect(() => {
     const savedSession = localStorage.getItem('alkhaf_user_session');
-    if (savedSession) {
-      setUser(JSON.parse(savedSession));
+    if (savedSession) setUser(JSON.parse(savedSession));
+
+    const savedTheme = localStorage.getItem('alkhaf_theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.documentElement.setAttribute('data-theme', 'dark');
     }
   }, []);
+
+  const toggleTheme = () => {
+    if (isDarkMode) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('alkhaf_theme', 'light');
+      setIsDarkMode(false);
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('alkhaf_theme', 'dark');
+      setIsDarkMode(true);
+    }
+  };
 
   // SUPABASE FETCHING & REAL-TIME
   useEffect(() => {
     if (user) {
       setIsLoading(true);
       fetchSettings();
-      fetchTransactions(); // fetches based on selected monthOffset
+      fetchTransactions(); 
 
       const txSub = supabase
         .channel('public:expenses')
@@ -110,7 +126,6 @@ function App() {
   };
 
   const fetchTransactions = async () => {
-    // 1. Calculate Start and End of selected month for DB filtering
     const startOfMonth = new Date(getReferenceDate.getFullYear(), getReferenceDate.getMonth(), 1).toISOString();
     const endOfMonth = new Date(getReferenceDate.getFullYear(), getReferenceDate.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
@@ -213,7 +228,6 @@ function App() {
     }
 
     if (amount > 0) {
-      // Create 2 paired rows to represent money moving without affecting Budget
       const transferOut = { name: `Transfer to ${toAcc}`, amount, account: fromAcc, category: 'Transfer Out', is_paid: true, date };
       const transferIn = { name: `Transfer from ${fromAcc}`, amount, account: toAcc, category: 'Transfer In', is_paid: true, date };
       
@@ -237,7 +251,6 @@ function App() {
     });
   };
 
-  // CSV EXPORT HANDLER
   const exportToCSV = () => {
     if (transactions.length === 0) {
       alert("Tidak ada transaksi untuk diekspor di bulan ini.");
@@ -283,7 +296,6 @@ function App() {
     document.body.removeChild(a);
   };
 
-  // SEARCH FILTER LOGIC
   const filteredTransactions = useMemo(() => {
     if (!searchQuery.trim()) return transactions;
     const lowerQ = searchQuery.toLowerCase();
@@ -294,10 +306,8 @@ function App() {
     );
   }, [transactions, searchQuery]);
 
-  // CALCULATIONS & CHART DATA
   const totals = useMemo(() => {
     const incomes = transactions.filter(t => t.category === 'Income');
-    // Actual expenses ignore Incomes AND Internal Transfers
     const expenses = transactions.filter(t => t.category !== 'Income' && !t.category.includes('Transfer'));
 
     const totalDynamicIncome = incomes.reduce((sum, inc) => sum + Number(inc.amount), 0);
@@ -309,7 +319,7 @@ function App() {
       if (categoryTotals[exp.category] !== undefined) {
         categoryTotals[exp.category] += Number(exp.amount);
       } else {
-        categoryTotals[exp.category] = Number(exp.amount); // fallback for categories deleted but still in records
+        categoryTotals[exp.category] = Number(exp.amount); 
       }
     });
 
@@ -322,16 +332,11 @@ function App() {
     const current = {};
     accounts.forEach(a => current[a.name] = Number(a.balance));
     
-    // We calculate balances based ONLY on this month? 
-    // WAIT! Account balances should ideally be derived from ALL TIME data. 
-    // But since we only fetched this month's transactions, previous months aren't here.
-    // NOTE: In a true robust app, Account Balances should be fetched via an aggregate RPC call from Supabase 
-    // encompassing ALL historical transactions. For this MVP, we will calculate based on fetched transactions.
     transactions.forEach(tx => {
       if(current[tx.account] !== undefined) {
         if (tx.category === 'Income' || tx.category === 'Transfer In') {
           current[tx.account] += Number(tx.amount);
-        } else if (tx.isPaid) { // Normal Expenses & Transfer Out
+        } else if (tx.isPaid) { 
           current[tx.account] -= Number(tx.amount);
         }
       }
@@ -343,10 +348,8 @@ function App() {
   const sumOfAccounts = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
   const sumOfCategories = categories.reduce((sum, cat) => sum + Number(cat.targetPercentage), 0);
   const usagePercentage = effectiveTotalIncome > 0 ? ((totals.allocated / effectiveTotalIncome) * 100).toFixed(1) : 0;
-  // Fallback to initial if currentAccountBalance isn't accurate across months (mocking total balance)
   const totalBalance = Object.values(currentAccountBalances).reduce((a, b) => a + b, 0);
 
-  // PREPARE CHART DATA
   const donutChartData = categories.map((cat, i) => ({
     name: cat.name,
     value: totals.categoryTotals[cat.name] || 0,
@@ -364,17 +367,17 @@ function App() {
           
           <form onSubmit={handleLogin}>
             {loginError && (
-              <div style={{background:'#fef2f2', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>
+              <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>
                 {loginError}
               </div>
             )}
             <div style={{marginBottom:'1.5rem', textAlign:'left'}}>
               <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Username</label>
-              <input type="text" name="username" required className="form-input" placeholder="Enter username" style={{background:'#f3f4f6'}} />
+              <input type="text" name="username" required className="form-input" placeholder="Enter username" />
             </div>
             <div style={{marginBottom:'2rem', textAlign:'left'}}>
               <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Password</label>
-              <input type="password" name="password" required className="form-input" placeholder="••••••••" style={{background:'#f3f4f6'}} />
+              <input type="password" name="password" required className="form-input" placeholder="••••••••" />
             </div>
             <button type="submit" className="btn-primary" style={{width:'100%', padding:'1rem'}}>
               Sign In to FinFlow
@@ -391,7 +394,7 @@ function App() {
       <div className="modal-content">
         <div className="modal-header">
           <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Settings</h2>
-          <button style={{background:'none', border:'none', cursor:'pointer'}} onClick={() => setIsSettingsOpen(false)}><X size={24}/></button>
+          <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsSettingsOpen(false)}><X size={24}/></button>
         </div>
         
         <div className="tabs">
@@ -411,7 +414,7 @@ function App() {
             
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
               <h3 style={{fontSize:'1rem', fontWeight:'600'}}>Base Accounts Setup</h3>
-              <button style={{background:'var(--accent-lime)', border:'none', padding:'0.5rem', borderRadius:'8px', cursor:'pointer'}} 
+              <button style={{background:'var(--accent-lime)', color:'#0f172a', border:'none', padding:'0.5rem', borderRadius:'8px', cursor:'pointer'}} 
                       onClick={() => setAccounts([...accounts, { id: `acc-${Date.now()}`, name: 'New Account', balance: 0 }])}>
                 <Plus size={16}/>
               </button>
@@ -436,7 +439,7 @@ function App() {
 
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
               <h3 style={{fontSize:'1rem', fontWeight:'600'}}>Categories Setup</h3>
-              <button style={{background:'var(--accent-lime)', border:'none', padding:'0.5rem', borderRadius:'8px', cursor:'pointer'}} 
+              <button style={{background:'var(--accent-lime)', color:'#0f172a', border:'none', padding:'0.5rem', borderRadius:'8px', cursor:'pointer'}} 
                       onClick={() => setCategories([...categories, { id: `cat-${Date.now()}`, name: 'New Category', targetPercentage: 0 }])}>
                 <Plus size={16}/>
               </button>
@@ -451,7 +454,7 @@ function App() {
           </div>
         )}
 
-        <button className="btn-primary" style={{width: '100%', marginTop:'2rem', padding:'1rem'}} onClick={saveSettings}>
+        <button className="btn-primary" style={{width: '100%', marginTop:'2rem', padding:'1rem', color:'white'}} onClick={saveSettings}>
           Save to Supabase
         </button>
       </div>
@@ -478,7 +481,7 @@ function App() {
         <div className="sidebar-bottom">
           <div className="profile-widget">
             <div className="profile-avatar">
-              <div style={{width:'100%', height:'100%', background:'var(--accent-lime)', color:'var(--accent-dark-green)', display:'grid', placeContent:'center', fontWeight:'700'}}>
+              <div style={{width:'100%', height:'100%', background:'var(--accent-lime)', color:'#0f172a', display:'grid', placeContent:'center', fontWeight:'700'}}>
                  {getInitial(user.name)}
               </div>
             </div>
@@ -521,7 +524,16 @@ function App() {
                 }}
               />
             </div>
-            <button style={{background:'white', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}} onClick={() => setIsSettingsOpen(true)}>
+            <button 
+              style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', color: 'var(--text-primary)'}} 
+              onClick={toggleTheme}
+            >
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <button 
+              style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', color: 'var(--text-primary)'}} 
+              onClick={() => setIsSettingsOpen(true)}
+            >
               <Settings size={20} />
             </button>
           </div>
@@ -541,7 +553,6 @@ function App() {
                  <p style={{opacity:0.8}}>Total Pool: {formatIDR(effectiveTotalIncome)} (Base: {formatIDR(baseTotalIncome)} + Top Up: {formatIDR(totals.totalDynamicIncome)})</p>
                </div>
                
-               {/* DYNAMIC MONTH TIMELINE FILTER */}
                <div style={{display:'flex', gap:'1rem'}}>
                  {timelineMonths.map((item, i) => {
                     const isCurrent = item.offset === monthOffset;
@@ -555,7 +566,7 @@ function App() {
                           display: 'flex',
                           justifyContent: 'center',
                           alignItems: 'center',
-                          color: isCurrent ? 'var(--text-primary)' : 'white',
+                          color: isCurrent ? '#0f172a' : 'white',
                           fontWeight: isCurrent ? '600' : '400',
                           transition: 'all 0.3s ease'
                         }}>
@@ -638,7 +649,7 @@ function App() {
                       {filteredTransactions.slice(0, 4).map((tx, i) => (
                         <div key={tx.id} className="transaction-item">
                           <div className="transaction-left">
-                            <div className="transaction-avatar" style={{background: tx.category === 'Income' ? 'var(--success)' : tx.category.includes('Transfer') ? 'var(--accent-blue-gray)' : `hsl(${i * 60 + 10}, 70%, 50%)`}}>
+                            <div className="transaction-avatar" style={{background: tx.category === 'Income' ? 'var(--success)' : tx.category.includes('Transfer') ? 'var(--accent-blue-gray)' : `hsl(${i * 60 + 10}, 70%, 50%)`, color: '#fff'}}>
                               {getInitial(tx.name.replace('Transfer to ', '').replace('Transfer from ', ''))}
                             </div>
                             <div className="transaction-details">
@@ -663,7 +674,7 @@ function App() {
                 <div className="widget-card" style={{display:'flex', flexDirection:'column', justifyContent:'center'}}>
                   <div className="widget-header" style={{marginBottom:'0.5rem'}}>
                     <span className="widget-title" style={{color:'var(--text-secondary)', fontWeight:'500'}}>Total Allocated</span>
-                    <div style={{background:'#fef2f2', padding:'0.5rem', borderRadius:'50%'}}>
+                    <div style={{background:'var(--danger-light)', padding:'0.5rem', borderRadius:'50%'}}>
                       <ArrowDownRight size={16} color="var(--danger)"/>
                     </div>
                   </div>
@@ -689,7 +700,7 @@ function App() {
                           </Pie>
                           <RechartsTooltip 
                             formatter={(value) => formatIDR(value)}
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -705,7 +716,7 @@ function App() {
                     {usagePercentage}% of Pool ({formatIDR(effectiveTotalIncome)})
                   </div>
                   
-                  <div style={{marginTop:'1.5rem', paddingTop:'1.5rem', borderTop:'1px solid #f3f4f6', textAlign:'center'}}>
+                  <div style={{marginTop:'1.5rem', paddingTop:'1.5rem', borderTop:'1px solid var(--border-color)', textAlign:'center'}}>
                     <div style={{color:'var(--text-secondary)', fontSize:'0.9rem'}}>Non-allocated / Remaining</div>
                     <div style={{fontSize:'1.5rem', fontWeight:'600', color:'var(--success)', marginTop:'0.25rem'}}>
                       {formatIDR(nonAllocated)}
@@ -735,7 +746,7 @@ function App() {
                               <span style={{fontWeight:'500'}}>{cat.name} ({cat.targetPercentage}%)</span>
                               <span>{formatIDR(amount)}</span>
                             </div>
-                            <div style={{height:'6px', background:'#f3f4f6', borderRadius:'3px', overflow:'hidden'}}>
+                            <div style={{height:'6px', background:'var(--bg-input)', borderRadius:'3px', overflow:'hidden'}}>
                               <div style={{height:'100%', width:`${Math.min(percent, 100)}%`, background:color}}></div>
                             </div>
                           </div>
@@ -749,12 +760,12 @@ function App() {
           </>
         ) : activeView === 'transactions' ? (
           <div className="widget-card" style={{minHeight: '600px'}}>
-            <div className="widget-header" style={{borderBottom:'1px solid #f3f4f6', paddingBottom:'1.5rem'}}>
+            <div className="widget-header" style={{borderBottom:'1px solid var(--border-color)', paddingBottom:'1.5rem'}}>
               <span className="widget-title">Transactions List ({filteredTransactions.length})</span>
               <div style={{display:'flex', gap:'0.5rem'}}>
-                <button className="btn-primary" onClick={() => setIsTransferOpen(true)} style={{background:'var(--accent-blue-gray)'}}><ArrowRightLeft size={16}/> Transfer</button>
-                <button className="btn-primary" onClick={() => setIsAddOpen(true)}><Plus size={16}/> Add Expense</button>
-                <button className="btn-primary" style={{background:'var(--success)'}} onClick={() => setIsTopUpOpen(true)}><ArrowUpRight size={16}/> Top Up</button>
+                <button className="btn-primary" onClick={() => setIsTransferOpen(true)} style={{background:'var(--accent-blue-gray)', color: '#fff'}}><ArrowRightLeft size={16}/> Transfer</button>
+                <button className="btn-primary" onClick={() => setIsAddOpen(true)} style={{color: '#fff'}}><Plus size={16}/> Add Expense</button>
+                <button className="btn-primary" style={{background:'var(--success)', color: '#fff'}} onClick={() => setIsTopUpOpen(true)}><ArrowUpRight size={16}/> Top Up</button>
               </div>
             </div>
             <table className="full-transactions-table">
@@ -791,13 +802,13 @@ function App() {
                         </td>
                         <td style={{color:'var(--text-secondary)', fontSize:'0.9rem'}}>{tx.date}</td>
                         <td>
-                          <span className={tx.isPaid && !isIncome && !isTransfer ? 'paid' : ''} style={{fontWeight:'500', textDecoration: tx.isPaid && !isIncome && !isTransfer ? 'line-through' : 'none', color: tx.isPaid && !isIncome && !isTransfer ? 'var(--text-secondary)' : 'inherit'}}>
+                          <span className={tx.isPaid && !isIncome && !isTransfer ? 'paid' : ''} style={{fontWeight:'500', textDecoration: tx.isPaid && !isIncome && !isTransfer ? 'line-through' : 'none', color: tx.isPaid && !isIncome && !isTransfer ? 'var(--text-secondary)' : 'var(--text-primary)'}}>
                             {tx.name}
                           </span>
                         </td>
                         <td>{tx.account}</td>
                         <td>
-                          <span style={{background: isIncome ? '#dcfce7' : isTransfer ? '#e0f2fe' : 'rgba(0,0,0,0.05)', color: isIncome ? 'var(--success)' : isTransfer ? 'var(--accent-blue-gray)' : 'inherit', padding:'0.2rem 0.8rem', borderRadius:'99px', fontSize:'0.8rem', fontWeight:'600'}}>
+                          <span style={{background: isIncome ? (isDarkMode ? 'rgba(52, 211, 153, 0.1)' : '#dcfce7') : isTransfer ? (isDarkMode ? 'rgba(58, 117, 135, 0.2)' : '#e0f2fe') : 'var(--hover-bg)', color: isIncome ? 'var(--success)' : isTransfer ? 'var(--accent-blue-gray)' : 'var(--text-primary)', padding:'0.2rem 0.8rem', borderRadius:'99px', fontSize:'0.8rem', fontWeight:'600'}}>
                             {tx.category}
                           </span>
                         </td>
@@ -818,7 +829,7 @@ function App() {
           </div>
         ) : activeView === 'profile' ? (
           <div className="widget-card" style={{maxWidth:'600px', margin:'0 auto', textAlign:'center', padding:'3rem'}}>
-            <div style={{width:'100px', height:'100px', borderRadius:'50%', margin:'0 auto 1.5rem', background:'var(--accent-lime)', color:'var(--accent-dark-green)', display:'grid', placeContent:'center', fontSize:'3rem', fontWeight:'700', overflow:'hidden'}}>
+            <div style={{width:'100px', height:'100px', borderRadius:'50%', margin:'0 auto 1.5rem', background:'var(--accent-lime)', color:'#0f172a', display:'grid', placeContent:'center', fontSize:'3rem', fontWeight:'700', overflow:'hidden'}}>
                {getInitial(user.name)}
             </div>
             <h2 style={{fontSize:'1.8rem', fontWeight:'700', marginBottom:'0.25rem'}}>{user.name}</h2>
@@ -827,7 +838,7 @@ function App() {
             </span>
 
             <div style={{display:'flex', gap:'1rem', justifyContent:'center'}}>
-              <button className="btn-primary" onClick={() => setIsSettingsOpen(true)}>
+              <button className="btn-primary" onClick={() => setIsSettingsOpen(true)} style={{color: 'white'}}>
                 <Settings size={18}/> Manage Settings
               </button>
               <button className="btn-danger" onClick={handleLogout} style={{padding:'0.75rem 1.5rem'}}>
@@ -844,7 +855,7 @@ function App() {
           <div className="modal-content">
             <div className="modal-header">
               <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Add New Expense</h2>
-              <button style={{background:'none', border:'none', cursor:'pointer'}} onClick={() => setIsAddOpen(false)}><X size={24}/></button>
+              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsAddOpen(false)}><X size={24}/></button>
             </div>
             <form onSubmit={addExpense}>
               <div style={{marginBottom:'1rem'}}>
@@ -867,7 +878,7 @@ function App() {
                   {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                 </select>
               </div>
-              <button type="submit" className="btn-primary" style={{width: '100%'}}>
+              <button type="submit" className="btn-primary" style={{width: '100%', color: 'white'}}>
                 Add Expense
               </button>
             </form>
@@ -881,7 +892,7 @@ function App() {
           <div className="modal-content">
             <div className="modal-header">
               <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Top Up / Add Income</h2>
-              <button style={{background:'none', border:'none', cursor:'pointer'}} onClick={() => setIsTopUpOpen(false)}><X size={24}/></button>
+              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsTopUpOpen(false)}><X size={24}/></button>
             </div>
             <form onSubmit={addTopUp}>
               <div style={{marginBottom:'1rem'}}>
@@ -898,7 +909,7 @@ function App() {
                   {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
                 </select>
               </div>
-              <button type="submit" className="btn-primary" style={{width: '100%', background:'var(--success)'}}>
+              <button type="submit" className="btn-primary" style={{width: '100%', background:'var(--success)', color: 'white'}}>
                 Add Income
               </button>
             </form>
@@ -912,7 +923,7 @@ function App() {
           <div className="modal-content">
             <div className="modal-header">
               <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Transfer Funds</h2>
-              <button style={{background:'none', border:'none', cursor:'pointer'}} onClick={() => setIsTransferOpen(false)}><X size={24}/></button>
+              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsTransferOpen(false)}><X size={24}/></button>
             </div>
             <form onSubmit={addTransfer}>
               <div style={{marginBottom:'1rem'}}>
@@ -934,7 +945,7 @@ function App() {
               <p style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginBottom:'1.5rem', fontStyle:'italic'}}>
                 * Transaksi transfer tidak akan mempengaruhi total persentase anggaran (budget donat) Anda.
               </p>
-              <button type="submit" className="btn-primary" style={{width: '100%', background:'var(--accent-blue-gray)'}}>
+              <button type="submit" className="btn-primary" style={{width: '100%', background:'var(--accent-blue-gray)', color: 'white'}}>
                 Transfer
               </button>
             </form>
