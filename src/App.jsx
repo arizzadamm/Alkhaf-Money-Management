@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, RefreshCw, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun } from 'lucide-react';
+import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, RefreshCw, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun, Target } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from './supabaseClient';
 import './App.css';
@@ -14,7 +14,7 @@ const formatIDR = (amount) => {
 
 const getInitial = (name) => name ? name.charAt(0).toUpperCase() : '?';
 
-const CHART_COLORS = ['#d2f411', '#213f31', '#2d5866', '#f59e0b', '#ec4899', '#8b5cf6'];
+const CHART_COLORS = ['#d2f411', '#213f31', '#2d5866', '#f59e0b', '#ec4899', '#8b5cf6', '#34d399', '#f87171'];
 
 function App() {
   // APP STATE
@@ -27,6 +27,7 @@ function App() {
   const [baseTotalIncome, setBaseTotalIncome] = useState(0);
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [goals, setGoals] = useState([]); // NEW STATE FOR GOALS
   const [transactions, setTransactions] = useState([]); 
   
   // UI STATE
@@ -49,7 +50,6 @@ function App() {
   }, [monthOffset]);
 
   const viewMonthName = getReferenceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-  const viewMonthShort = getReferenceDate.toLocaleString('en-US', { month: 'short' });
 
   const timelineMonths = useMemo(() => {
     const result = [];
@@ -122,6 +122,7 @@ function App() {
       setBaseTotalIncome(data.total_income);
       setAccounts(data.accounts || []);
       setCategories(data.categories || []);
+      setGoals(data.goals || []); // LOAD GOALS
     }
   };
 
@@ -247,8 +248,31 @@ function App() {
       id: 1, 
       total_income: baseTotalIncome, 
       accounts: accounts,
-      categories: categories
+      categories: categories,
+      goals: goals // SAVE GOALS
     });
+  };
+
+  // GOAL HELPER
+  const quickAddGoalFund = (goalId, amountToAdd) => {
+    const amount = parseFloat(prompt('Berapa nominal (IDR) yang ingin ditambahkan ke tabungan impian ini?', amountToAdd || '0'));
+    if (!isNaN(amount) && amount > 0) {
+      const updatedGoals = goals.map(g => {
+        if (g.id === goalId) {
+          return { ...g, currentAmount: Number(g.currentAmount) + amount };
+        }
+        return g;
+      });
+      setGoals(updatedGoals);
+      // Auto-save setting to supabase silently
+      supabase.from('app_settings').upsert({
+        id: 1, 
+        total_income: baseTotalIncome, 
+        accounts: accounts,
+        categories: categories,
+        goals: updatedGoals
+      }).then();
+    }
   };
 
   const exportToCSV = () => {
@@ -397,9 +421,10 @@ function App() {
           <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsSettingsOpen(false)}><X size={24}/></button>
         </div>
         
-        <div className="tabs">
-          <div className={`tab ${settingsTab === 'accounts' ? 'active' : ''}`} onClick={() => setSettingsTab('accounts')}>Income & Accounts</div>
-          <div className={`tab ${settingsTab === 'categories' ? 'active' : ''}`} onClick={() => setSettingsTab('categories')}>Budget Allocations</div>
+        <div className="tabs" style={{overflowX: 'auto', whiteSpace: 'nowrap'}}>
+          <div className={`tab ${settingsTab === 'accounts' ? 'active' : ''}`} onClick={() => setSettingsTab('accounts')}>Accounts</div>
+          <div className={`tab ${settingsTab === 'categories' ? 'active' : ''}`} onClick={() => setSettingsTab('categories')}>Budgets</div>
+          <div className={`tab ${settingsTab === 'goals' ? 'active' : ''}`} onClick={() => setSettingsTab('goals')}>Goals</div>
         </div>
 
         {settingsTab === 'accounts' && (
@@ -449,6 +474,36 @@ function App() {
                 <input type="text" className="form-input" value={cat.name} onChange={(e) => setCategories(categories.map(c => c.id === cat.id ? { ...c, name: e.target.value } : c))} placeholder="Category Name"/>
                 <input type="number" className="form-input" value={cat.targetPercentage} onChange={(e) => setCategories(categories.map(c => c.id === cat.id ? { ...c, targetPercentage: Number(e.target.value) } : c))} placeholder="Percentage (e.g. 20)"/>
                 <button className="btn-danger" onClick={() => setCategories(categories.filter(c => c.id !== cat.id))}><Trash2 size={20}/></button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {settingsTab === 'goals' && (
+          <div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
+              <h3 style={{fontSize:'1rem', fontWeight:'600'}}>Savings Goals Setup</h3>
+              <button style={{background:'var(--accent-lime)', color:'#0f172a', border:'none', padding:'0.5rem', borderRadius:'8px', cursor:'pointer'}} 
+                      onClick={() => setGoals([...goals, { id: `goal-${Date.now()}`, name: 'New Goal', targetAmount: 10000000, currentAmount: 0 }])}>
+                <Plus size={16}/>
+              </button>
+            </div>
+            {goals.map(goal => (
+              <div style={{background: 'var(--hover-bg)', padding:'1rem', borderRadius:'12px', marginBottom:'1rem'}} key={goal.id}>
+                <div style={{display:'flex', gap:'0.5rem', marginBottom:'0.5rem'}}>
+                  <input type="text" className="form-input" value={goal.name} onChange={(e) => setGoals(goals.map(g => g.id === goal.id ? { ...g, name: e.target.value } : g))} placeholder="Goal Name (e.g. Vacation)"/>
+                  <button className="btn-danger" onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}><Trash2 size={20}/></button>
+                </div>
+                <div style={{display:'flex', gap:'0.5rem'}}>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Current Saved</label>
+                    <input type="number" className="form-input" value={goal.currentAmount} onChange={(e) => setGoals(goals.map(g => g.id === goal.id ? { ...g, currentAmount: Number(e.target.value) } : g))} placeholder="0"/>
+                  </div>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Target Amount</label>
+                    <input type="number" className="form-input" value={goal.targetAmount} onChange={(e) => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetAmount: Number(e.target.value) } : g))} placeholder="1000000"/>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -666,6 +721,54 @@ function App() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                {/* SAVINGS GOALS WIDGET */}
+                <div className="widget-card">
+                  <div className="widget-header">
+                    <span className="widget-title">Savings Goals</span>
+                    <button className="see-all" onClick={() => { setIsSettingsOpen(true); setSettingsTab('goals'); }} style={{background:'none', border:'none'}}><Plus size={16}/> Add Goal</button>
+                  </div>
+                  <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
+                    {goals.length === 0 ? (
+                      <span style={{color:'var(--text-secondary)', fontSize:'0.9rem'}}>You haven't set any savings goals yet. Start dreaming!</span>
+                    ) : (
+                      goals.map((goal, i) => {
+                        const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
+                        const color = CHART_COLORS[i % CHART_COLORS.length];
+                        const isComplete = percent >= 100;
+                        
+                        return (
+                          <div key={goal.id}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'0.5rem'}}>
+                              <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
+                                <div style={{width:'36px', height:'36px', borderRadius:'10px', background: isComplete ? 'var(--success)' : 'var(--bg-input)', display:'grid', placeContent:'center', color: isComplete ? 'white' : color}}>
+                                  {isComplete ? <CheckCircle2 size={18}/> : <Target size={18}/>}
+                                </div>
+                                <div>
+                                  <div style={{fontWeight:'600', fontSize:'0.95rem'}}>{goal.name}</div>
+                                  <div style={{fontSize:'0.75rem', color:'var(--text-secondary)'}}>
+                                    {formatIDR(goal.currentAmount)} / {formatIDR(goal.targetAmount)}
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{textAlign:'right'}}>
+                                <div style={{fontWeight:'700', fontSize:'1.1rem', color: isComplete ? 'var(--success)' : 'inherit'}}>{percent.toFixed(0)}%</div>
+                                {!isComplete && (
+                                  <button onClick={() => quickAddGoalFund(goal.id)} style={{background:'none', border:'none', color:'var(--accent-blue-gray)', fontSize:'0.75rem', fontWeight:'600', cursor:'pointer', padding:'0.25rem 0'}}>
+                                    + Add Fund
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{height:'8px', background:'var(--bg-input)', borderRadius:'4px', overflow:'hidden'}}>
+                              <div style={{height:'100%', width:`${percent}%`, background: isComplete ? 'var(--success)' : color, borderRadius:'4px', transition:'width 0.5s ease-in-out'}}></div>
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
                   </div>
                 </div>
               </div>
