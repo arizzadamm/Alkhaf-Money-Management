@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun, Target, Eye, ChevronRight, Users } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import QRCode from 'qrcode';
 import { supabase } from './supabaseClient';
 import './App.css';
 
@@ -16,6 +17,7 @@ const getInitial = (name) => name ? name.charAt(0).toUpperCase() : '?';
 const SESSION_STORAGE_KEY = 'alkhaf_user_session';
 const REMEMBER_ME_KEY = 'alkhaf_remember_me';
 const SESSION_PROOF_KEY = 'alkhaf_session_proof';
+const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
 
 const hashPassword = async (password) => {
   const bytes = new TextEncoder().encode(password);
@@ -70,6 +72,7 @@ function App() {
   const [telegramError, setTelegramError] = useState('');
   const [telegramSuccess, setTelegramSuccess] = useState('');
   const [isTelegramLoading, setIsTelegramLoading] = useState(false);
+  const [telegramQrCode, setTelegramQrCode] = useState('');
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
@@ -688,6 +691,44 @@ function App() {
     if (!user || isAdmin || !isSettingsOpen || settingsTab !== 'telegram') return;
     fetchTelegramConnections();
   }, [user, isAdmin, isSettingsOpen, settingsTab]);
+
+  const telegramStartLink = useMemo(() => {
+    if (!telegramLinkToken?.token) return '';
+    if (!TELEGRAM_BOT_USERNAME) return '';
+    return `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(telegramLinkToken.token)}`;
+  }, [telegramLinkToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const buildQrCode = async () => {
+      if (!telegramLinkToken?.token) {
+        setTelegramQrCode('');
+        return;
+      }
+
+      try {
+        const qrValue = telegramStartLink || telegramLinkToken.token;
+        const url = await QRCode.toDataURL(qrValue, {
+          width: 280,
+          margin: 1,
+          color: {
+            dark: '#213f31',
+            light: '#ffffff'
+          }
+        });
+
+        if (!cancelled) setTelegramQrCode(url);
+      } catch (error) {
+        if (!cancelled) setTelegramQrCode('');
+      }
+    };
+
+    buildQrCode();
+    return () => {
+      cancelled = true;
+    };
+  }, [telegramLinkToken, telegramStartLink]);
 
   const totals = useMemo(() => {
     const incomes = transactions.filter(t => t.category === 'Income');
@@ -1501,6 +1542,30 @@ function App() {
                 <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.5rem'}}>
                   Berlaku sampai {new Date(telegramLinkToken.expires_at).toLocaleString('id-ID')}
                 </div>
+                {telegramQrCode && (
+                  <div className="telegram-qr-section">
+                    <div className="telegram-qr-card">
+                      <img src={telegramQrCode} alt="QR code untuk menghubungkan Telegram" className="telegram-qr-image" />
+                    </div>
+                    <div style={{fontSize:'0.9rem', color:'var(--text-secondary)', lineHeight:'1.5'}}>
+                      {telegramStartLink ? (
+                        <>
+                          Scan QR ini untuk membuka bot Telegram dan meneruskan token secara otomatis.
+                          <div style={{marginTop:'0.5rem', wordBreak:'break-all'}}>
+                            <a href={telegramStartLink} target="_blank" rel="noreferrer" style={{color:'var(--accent-dark-green)', fontWeight:'600'}}>
+                              Buka bot Telegram
+                            </a>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          QR masih berisi token mentah karena username bot belum diatur.
+                          Tambahkan `VITE_TELEGRAM_BOT_USERNAME` agar scan langsung membuka bot Telegram.
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -184,6 +184,7 @@
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal-content { border-radius: 24px 24px 0 0; padding: 1.5rem; padding-bottom: 2.5rem; animation: slideUp 0.3s ease-out; }
   .login-card { margin: 1.5rem; padding: 2rem; }
+  .telegram-qr-image { width: 160px; height: 160px; }
 }
 
 @keyframes slideUp {
@@ -233,6 +234,24 @@
   letter-spacing: 0.18rem;
   font-weight: 800;
   color: var(--accent-dark-green);
+}
+.telegram-qr-section {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+.telegram-qr-card {
+  background: white;
+  padding: 0.75rem;
+  border-radius: 20px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+.telegram-qr-image {
+  width: 180px;
+  height: 180px;
+  display: block;
 }
 .telegram-empty-state {
   background: var(--hover-bg);

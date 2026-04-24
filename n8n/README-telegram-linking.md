@@ -19,6 +19,22 @@ File workflow yang sudah disesuaikan untuk sistem multi-user ada di:
 - Linking: `https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-link`
 - Ingest expense: `https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-expense-ingest`
 
+## QR code di aplikasi
+
+Supaya user tinggal scan tanpa mengetik token manual, set username bot di frontend:
+
+```env
+VITE_TELEGRAM_BOT_USERNAME=nama_bot_telegram_anda
+```
+
+Kalau env ini terisi, aplikasi akan membuat QR deep link dengan format:
+
+```text
+https://t.me/<bot_username>?start=<token>
+```
+
+Saat QR di-scan, user akan langsung dibawa ke bot Telegram dengan payload token linking.
+
 ## Payload utama untuk ingest
 
 ```json
