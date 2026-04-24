@@ -11,7 +11,7 @@
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.2,
       "position": [
-        -260,
+        -680,
         0
       ],
       "id": "ea5c5df7-c22d-4dab-bbb1-294ebb9298d7",
@@ -26,17 +26,88 @@
     },
     {
       "parameters": {
+        "jsCode": "const message = $input.first().json.message || {};\nconst text = String(message.text || '').trim();\nconst isStartCommand = /^\\/start(\\s+.+)?$/i.test(text);\n\nreturn {\n  raw_text: text,\n  is_start_command: isStartCommand,\n  chat_id: message.chat?.id || null,\n  user_id: message.from?.id || null\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -470,
+        0
+      ],
+      "id": "f1f2d3a4-1000-4000-9000-routecheck0001",
+      "name": "Route Message"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-start-ignore",
+              "leftValue": "={{ $json.is_start_command }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -250,
+        0
+      ],
+      "id": "f1f2d3a4-1000-4000-9000-routeif000002",
+      "name": "Is Start Command?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Perintah /start diproses di workflow linking. Kirim pesan transaksi biasa seperti: makan siang 25000 dari Bank Jago kategori Needs.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -20,
+        -120
+      ],
+      "id": "f1f2d3a4-1000-4000-9000-startreply0003",
+      "name": "Reply Start Help",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
         "promptType": "define",
-        "text": "={{ $json.message.text }}",
+        "text": "={{ $('Telegram Trigger').item.json.message.text }}",
         "options": {
-          "systemMessage": "Anda adalah asisten pencatat keuangan. Ekstrak pesan pengguna dan keluarkan HANYA dalam format JSON baku dengan keys: name (string), amount (angka murni tanpa titik), account (string), dan category (string: pilih antara 'Needs', 'Wants', atau 'Savings')."
+          "systemMessage": "Anda adalah asisten pencatat keuangan. Ekstrak pesan pengguna dan keluarkan HANYA dalam format JSON baku dengan keys: name (string), amount (angka murni tanpa titik), account (string), dan category (string: pilih antara 'Needs', 'Wants', atau 'Savings'). Jika tidak yakin, tetap keluarkan JSON dengan field kosong atau 0."
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -40,
-        0
+        -20,
+        80
       ],
       "id": "5cb2717f-1736-4009-af93-222e6b9cbdfa",
       "name": "AI Agent"
@@ -49,8 +120,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
-        -40,
-        180
+        -20,
+        260
       ],
       "id": "b3225ffc-dc05-4a64-a997-9bf2c411ec39",
       "name": "Google Gemini Chat Model",
@@ -63,16 +134,50 @@
     },
     {
       "parameters": {
-        "jsCode": "let aiResponse = $input.first().json.output;\n\nif (!aiResponse) {\n  return { error: 'Tidak ada respon dari AI' };\n}\n\nlet cleanText = aiResponse\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\ntry {\n  let parsedData = JSON.parse(cleanText);\n  parsedData.date = new Date().toLocaleDateString('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  });\n  parsedData.is_paid = true;\n  return parsedData;\n} catch (error) {\n  return {\n    error: 'AI gagal menghasilkan format JSON yang valid',\n    original_text: aiResponse,\n    details: error.message\n  };\n}\n"
+        "jsCode": "const aiResponse = $input.first().json.output;\nconst rawMessage = String($('Telegram Trigger').item.json.message.text || '').trim();\n\nif (!aiResponse) {\n  return {\n    ok: false,\n    message: 'Bot belum bisa membaca transaksi Anda. Coba tulis seperti: makan siang 25000 dari Bank Jago kategori Needs.',\n    raw_text: rawMessage\n  };\n}\n\nconst cleanText = String(aiResponse)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\ntry {\n  const parsedData = JSON.parse(cleanText);\n  const normalized = {\n    name: String(parsedData.name || '').trim(),\n    amount: Number(parsedData.amount || 0),\n    account: String(parsedData.account || '').trim(),\n    category: String(parsedData.category || '').trim(),\n    is_paid: true,\n    date: new Date().toLocaleDateString('en-US', {\n      month: 'short',\n      day: 'numeric',\n      year: 'numeric'\n    })\n  };\n\n  const validCategories = ['Needs', 'Wants', 'Savings'];\n  const hasRequiredFields = Boolean(normalized.name) && normalized.amount > 0 && Boolean(normalized.account) && validCategories.includes(normalized.category);\n\n  if (!hasRequiredFields) {\n    return {\n      ok: false,\n      message: 'Format transaksi belum lengkap. Contoh: makan siang 25000 dari Bank Jago kategori Needs.',\n      parsed_preview: normalized,\n      raw_text: rawMessage\n    };\n  }\n\n  return {\n    ok: true,\n    ...normalized,\n    budget_month: new Date().toISOString().slice(0, 7)\n  };\n} catch (error) {\n  return {\n    ok: false,\n    message: 'Format transaksi belum bisa dipahami. Coba kirim dengan nominal, akun, dan kategori yang jelas.',\n    original_text: aiResponse,\n    details: error.message,\n    raw_text: rawMessage\n  };\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         220,
-        0
+        80
       ],
       "id": "ab207980-374f-4b39-acfc-c1f678800fc2",
-      "name": "Code"
+      "name": "Validate Transaction"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-ok-transaction",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        80
+      ],
+      "id": "f1f2d3a4-1000-4000-9000-validif00004",
+      "name": "Transaction Valid?"
     },
     {
       "parameters": {
@@ -97,13 +202,13 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"telegram_chat_id\": {{ $('Telegram Trigger').item.json.message.chat.id }},\n  \"telegram_user_id\": {{ $('Telegram Trigger').item.json.message.from.id }},\n  \"name\": \"{{ $json.name }}\",\n  \"amount\": {{ $json.amount }},\n  \"account\": \"{{ $json.account }}\",\n  \"category\": \"{{ $json.category }}\",\n  \"is_paid\": true,\n  \"date\": \"{{ $now.setZone('Asia/Jakarta').toFormat('MMM d, yyyy') }}\",\n  \"budget_month\": \"{{ $now.setZone('Asia/Jakarta').toFormat('yyyy-MM') }}\"\n}\n",
+        "jsonBody": "={\n  \"telegram_chat_id\": {{ $('Telegram Trigger').item.json.message.chat.id }},\n  \"telegram_user_id\": {{ $('Telegram Trigger').item.json.message.from.id }},\n  \"name\": \"{{ $json.name }}\",\n  \"amount\": {{ $json.amount }},\n  \"account\": \"{{ $json.account }}\",\n  \"category\": \"{{ $json.category }}\",\n  \"is_paid\": true,\n  \"date\": \"{{ $json.date }}\",\n  \"budget_month\": \"{{ $now.setZone('Asia/Jakarta').toFormat('yyyy-MM') }}\"\n}\n",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        500,
+        680,
         0
       ],
       "id": "1daf574c-eddd-40c2-a14a-9933f44c7bd0",
@@ -112,7 +217,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
-        "text": "=✅ Berhasil dicatat!\\n📝 Item: {{ $('Code').item.json.name }}\\n💸 Nominal: Rp{{ $('Code').item.json.amount.toLocaleString('id-ID') }}\\n🏦 Akun: {{ $('Code').item.json.account }}\\n📂 Kategori: {{ $('Code').item.json.category }}",
+        "text": "=✅ Berhasil dicatat!\\n📝 Item: {{ $('Validate Transaction').item.json.name }}\\n💸 Nominal: Rp{{ $('Validate Transaction').item.json.amount.toLocaleString('id-ID') }}\\n🏦 Akun: {{ $('Validate Transaction').item.json.account }}\\n📂 Kategori: {{ $('Validate Transaction').item.json.category }}",
         "additionalFields": {
           "appendAttribution": false
         }
@@ -120,11 +225,35 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        740,
+        930,
         0
       ],
       "id": "f1654717-9743-476b-aefb-fcf1f53fd14d",
-      "name": "Send a text message",
+      "name": "Send Success Message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.message || 'Format transaksi belum lengkap. Coba lagi dengan format yang lebih jelas.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        180
+      ],
+      "id": "f1f2d3a4-1000-4000-9000-invalidreply05",
+      "name": "Send Invalid Message",
       "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
       "credentials": {
         "telegramApi": {
@@ -138,6 +267,35 @@
   "connections": {
     "Telegram Trigger": {
       "main": [
+        [
+          {
+            "node": "Route Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Message": {
+      "main": [
+        [
+          {
+            "node": "Is Start Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Start Command?": {
+      "main": [
+        [
+          {
+            "node": "Reply Start Help",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "AI Agent",
@@ -162,18 +320,36 @@
       "main": [
         [
           {
-            "node": "Code",
+            "node": "Validate Transaction",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code": {
+    "Validate Transaction": {
+      "main": [
+        [
+          {
+            "node": "Transaction Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transaction Valid?": {
       "main": [
         [
           {
             "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Invalid Message",
             "type": "main",
             "index": 0
           }
@@ -184,7 +360,7 @@
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Send Success Message",
             "type": "main",
             "index": 0
           }

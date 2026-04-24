@@ -1,0 +1,216 @@
+{
+  "name": "Telegram Linking - One To Many",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -620,
+        0
+      ],
+      "id": "6a5b4c3d-1000-4000-9000-linktrigger0001",
+      "name": "Telegram Trigger",
+      "webhookId": "ee12820e-cf44-47d7-99dd-5de073223126",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const message = $input.first().json.message || {};\nconst rawText = String(message.text || '').trim();\nconst match = rawText.match(/^\\/start(?:\\s+(.+))?$/i);\nconst token = match?.[1] ? String(match[1]).trim().toUpperCase() : '';\n\nreturn {\n  raw_text: rawText,\n  token,\n  has_token: Boolean(token),\n  chat_id: message.chat?.id || null,\n  user_id: message.from?.id || null,\n  chat_type: message.chat?.type || 'private',\n  label: message.chat?.title || message.from?.username || message.from?.first_name || null\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        0
+      ],
+      "id": "6a5b4c3d-1000-4000-9000-tokenparse0002",
+      "name": "Parse Start Token"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-has-token",
+              "leftValue": "={{ $json.has_token }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -180,
+        0
+      ],
+      "id": "6a5b4c3d-1000-4000-9000-hastoken00003",
+      "name": "Has Token?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-link",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"consume_token\",\n  \"token\": \"{{ $json.token }}\",\n  \"telegramChatId\": {{ $json.chat_id }},\n  \"telegramUserId\": {{ $json.user_id }},\n  \"chatType\": \"{{ $json.chat_type }}\",\n  \"label\": \"{{ $json.label || '' }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        60,
+        -80
+      ],
+      "id": "6a5b4c3d-1000-4000-9000-consumetoken04",
+      "name": "Consume Token"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=✅ Telegram berhasil terhubung ke akun AlkaFlow Anda. Mulai sekarang Anda bisa kirim transaksi langsung lewat chat ini.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        -80
+      ],
+      "id": "6a5b4c3d-1000-4000-9000-linksuccess005",
+      "name": "Send Success Message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Token linking tidak ditemukan. Buka menu Profile > Telegram di AlkaFlow lalu generate token baru, kemudian scan QR atau kirim /start TOKEN lagi.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        60,
+        160
+      ],
+      "id": "6a5b4c3d-1000-4000-9000-linkhelp00006",
+      "name": "Send Missing Token Message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Start Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Start Token": {
+      "main": [
+        [
+          {
+            "node": "Has Token?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Token?": {
+      "main": [
+        [
+          {
+            "node": "Consume Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Missing Token Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consume Token": {
+      "main": [
+        [
+          {
+            "node": "Send Success Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

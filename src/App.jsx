@@ -786,7 +786,7 @@ function App() {
         <div>
           <div className="telegram-settings-title">Hubungkan Telegram</div>
           <div className="telegram-settings-copy">
-            Generate token lalu scan QR untuk membuka bot Telegram dengan payload token otomatis. Jika perlu, Anda tetap bisa copy token manual.
+            Generate token lalu scan QR untuk menghubungkan akun Telegram Anda.
           </div>
         </div>
         <button type="button" className="btn-primary" onClick={generateTelegramLinkToken} disabled={isTelegramLoading} style={{color:'white'}}>
@@ -821,20 +821,16 @@ function App() {
               <div style={{fontSize:'0.9rem', color:'var(--text-secondary)', lineHeight:'1.5'}}>
                 {telegramStartLink ? (
                   <>
-                    Scan QR ini untuk langsung membuka bot Telegram beserta token linking-nya.
+                    Scan QR ini untuk membuka Telegram dan melanjutkan proses koneksi.
                     <div style={{marginTop:'0.5rem', wordBreak:'break-all'}}>
                       <a href={telegramStartWebLink} target="_blank" rel="noreferrer" style={{color:'var(--accent-dark-green)', fontWeight:'600'}}>
-                        Buka bot Telegram via browser
+                        Buka Telegram
                       </a>
-                    </div>
-                    <div style={{fontSize:'0.8rem', marginTop:'0.5rem'}}>
-                      Jika sebelumnya username bot Anda ditulis memakai `@`, sekarang otomatis dibersihkan oleh aplikasi.
                     </div>
                   </>
                 ) : (
                   <>
-                    QR masih berisi token mentah karena username bot belum diatur.
-                    Tambahkan `VITE_TELEGRAM_BOT_USERNAME` tanpa `@` agar scan langsung membuka bot Telegram.
+                    QR siap dipakai untuk proses koneksi Telegram.
                   </>
                 )}
               </div>
@@ -847,7 +843,7 @@ function App() {
         <div>
           <div className="telegram-settings-title">Koneksi Saat Ini</div>
           <div className="telegram-settings-copy">
-            Workflow `n8n` akan memakai `telegram_chat_id` yang terhubung di sini untuk menentukan transaksi masuk ke user yang benar.
+            Daftar akun Telegram yang sudah terhubung ke akun ini.
           </div>
         </div>
       </div>
@@ -856,7 +852,7 @@ function App() {
         <div style={{color:'var(--text-secondary)', marginTop:'1rem'}}>Memuat koneksi Telegram...</div>
       ) : telegramConnections.length === 0 ? (
         <div className="telegram-empty-state">
-          Belum ada koneksi Telegram. Setelah token dipakai di bot dan diverifikasi, koneksi akan muncul di sini.
+          Belum ada koneksi Telegram.
         </div>
       ) : (
         <div style={{display:'flex', flexDirection:'column', gap:'0.75rem', marginTop:'1rem'}}>
@@ -1583,10 +1579,10 @@ function App() {
         {settingsTab === 'accounts' && (
           <div>
              <div style={{marginBottom: '1.5rem'}}>
-              <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Base Monthly Income (IDR)</label>
+              <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Income Bulanan (IDR)</label>
               <input type="number" className="form-input" value={baseTotalIncome} onChange={(e) => setBaseTotalIncome(Number(e.target.value))} />
               <div style={{marginTop: '0.5rem', fontSize: '0.85rem', color: sumOfAccounts !== baseTotalIncome ? 'var(--danger)' : 'var(--success)'}}>
-                Sum of Base Accounts: {formatIDR(sumOfAccounts)} {sumOfAccounts !== baseTotalIncome && `(Mismatch by ${formatIDR(Math.abs(baseTotalIncome - sumOfAccounts))})`}
+                Total akun: {formatIDR(sumOfAccounts)}
               </div>
             </div>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
@@ -1607,7 +1603,7 @@ function App() {
         {settingsTab === 'categories' && (
           <div>
             <div style={{marginBottom: '1.5rem'}}>
-              <div style={{fontSize: '0.9rem', color: sumOfCategories !== 100 ? 'var(--danger)' : 'var(--success)'}}>Total Allocation: {sumOfCategories}% {sumOfCategories !== 100 && `(Should be exactly 100%)`}</div>
+              <div style={{fontSize: '0.9rem', color: sumOfCategories !== 100 ? 'var(--danger)' : 'var(--success)'}}>Total alokasi: {sumOfCategories}%</div>
             </div>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
               <h3 style={{fontSize:'1rem', fontWeight:'600'}}>Categories Setup</h3>
@@ -1639,11 +1635,11 @@ function App() {
                 </div>
                 <div style={{display:'flex', gap:'0.5rem'}}>
                   <div style={{flex:1}}>
-                    <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Current Saved</label>
+                    <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Terkumpul</label>
                     <input type="number" className="form-input" value={goal.currentAmount} onChange={(e) => setGoals(goals.map(g => g.id === goal.id ? { ...g, currentAmount: Number(e.target.value) } : g))} placeholder="0"/>
                   </div>
                   <div style={{flex:1}}>
-                    <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Target Amount</label>
+                    <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Target</label>
                     <input type="number" className="form-input" value={goal.targetAmount} onChange={(e) => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetAmount: Number(e.target.value) } : g))} placeholder="1000000"/>
                   </div>
                 </div>
