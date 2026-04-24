@@ -17,7 +17,7 @@ const getInitial = (name) => name ? name.charAt(0).toUpperCase() : '?';
 const SESSION_STORAGE_KEY = 'alkhaf_user_session';
 const REMEMBER_ME_KEY = 'alkhaf_remember_me';
 const SESSION_PROOF_KEY = 'alkhaf_session_proof';
-const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
+const TELEGRAM_BOT_USERNAME = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').replace(/^@+/, '').trim();
 
 const hashPassword = async (password) => {
   const bytes = new TextEncoder().encode(password);
@@ -688,14 +688,20 @@ function App() {
   }, [transactions, searchQuery]);
 
   useEffect(() => {
-    if (!user || isAdmin || !isSettingsOpen || settingsTab !== 'telegram') return;
+    if (!user || isAdmin || activeView !== 'profile') return;
     fetchTelegramConnections();
-  }, [user, isAdmin, isSettingsOpen, settingsTab]);
+  }, [user, isAdmin, activeView]);
 
   const telegramStartLink = useMemo(() => {
     if (!telegramLinkToken?.token) return '';
     if (!TELEGRAM_BOT_USERNAME) return '';
-    return `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(telegramLinkToken.token)}`;
+    return `tg://resolve?domain=${encodeURIComponent(TELEGRAM_BOT_USERNAME)}&start=${encodeURIComponent(telegramLinkToken.token)}`;
+  }, [telegramLinkToken]);
+
+  const telegramStartWebLink = useMemo(() => {
+    if (!telegramLinkToken?.token) return '';
+    if (!TELEGRAM_BOT_USERNAME) return '';
+    return `https://t.me/${encodeURIComponent(TELEGRAM_BOT_USERNAME)}?start=${encodeURIComponent(telegramLinkToken.token)}`;
   }, [telegramLinkToken]);
 
   useEffect(() => {
@@ -766,6 +772,125 @@ function App() {
   const donutChartData = categories.map((cat, i) => ({
     name: cat.name, value: totals.categoryTotals[cat.name] || 0, color: CHART_COLORS[i % CHART_COLORS.length]
   })).filter(d => d.value > 0); 
+
+  const renderTelegramProfilePanel = () => (
+    <div className="widget-card telegram-profile-card">
+      <div className="widget-header" style={{marginBottom:'1rem'}}>
+        <span className="widget-title">Telegram Integration</span>
+        <button type="button" className="btn-primary" onClick={fetchTelegramConnections} disabled={isTelegramLoading} style={{color:'white'}}>
+          Refresh
+        </button>
+      </div>
+
+      <div className="telegram-settings-card">
+        <div>
+          <div className="telegram-settings-title">Hubungkan Telegram</div>
+          <div className="telegram-settings-copy">
+            Generate token lalu scan QR untuk membuka bot Telegram dengan payload token otomatis. Jika perlu, Anda tetap bisa copy token manual.
+          </div>
+        </div>
+        <button type="button" className="btn-primary" onClick={generateTelegramLinkToken} disabled={isTelegramLoading} style={{color:'white'}}>
+          {isTelegramLoading ? 'Memproses...' : 'Generate Token'}
+        </button>
+      </div>
+
+      {telegramError && (
+        <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
+          {telegramError}
+        </div>
+      )}
+
+      {telegramSuccess && (
+        <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
+          {telegramSuccess}
+        </div>
+      )}
+
+      {telegramLinkToken && (
+        <div className="telegram-token-box">
+          <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginBottom:'0.4rem'}}>Token aktif</div>
+          <div className="telegram-token-value">{telegramLinkToken.token}</div>
+          <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.5rem'}}>
+            Berlaku sampai {new Date(telegramLinkToken.expires_at).toLocaleString('id-ID')}
+          </div>
+          {telegramQrCode && (
+            <div className="telegram-qr-section">
+              <div className="telegram-qr-card">
+                <img src={telegramQrCode} alt="QR code untuk menghubungkan Telegram" className="telegram-qr-image" />
+              </div>
+              <div style={{fontSize:'0.9rem', color:'var(--text-secondary)', lineHeight:'1.5'}}>
+                {telegramStartLink ? (
+                  <>
+                    Scan QR ini untuk langsung membuka bot Telegram beserta token linking-nya.
+                    <div style={{marginTop:'0.5rem', wordBreak:'break-all'}}>
+                      <a href={telegramStartWebLink} target="_blank" rel="noreferrer" style={{color:'var(--accent-dark-green)', fontWeight:'600'}}>
+                        Buka bot Telegram via browser
+                      </a>
+                    </div>
+                    <div style={{fontSize:'0.8rem', marginTop:'0.5rem'}}>
+                      Jika sebelumnya username bot Anda ditulis memakai `@`, sekarang otomatis dibersihkan oleh aplikasi.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    QR masih berisi token mentah karena username bot belum diatur.
+                    Tambahkan `VITE_TELEGRAM_BOT_USERNAME` tanpa `@` agar scan langsung membuka bot Telegram.
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="telegram-settings-card" style={{marginTop:'1rem'}}>
+        <div>
+          <div className="telegram-settings-title">Koneksi Saat Ini</div>
+          <div className="telegram-settings-copy">
+            Workflow `n8n` akan memakai `telegram_chat_id` yang terhubung di sini untuk menentukan transaksi masuk ke user yang benar.
+          </div>
+        </div>
+      </div>
+
+      {isTelegramLoading && telegramConnections.length === 0 ? (
+        <div style={{color:'var(--text-secondary)', marginTop:'1rem'}}>Memuat koneksi Telegram...</div>
+      ) : telegramConnections.length === 0 ? (
+        <div className="telegram-empty-state">
+          Belum ada koneksi Telegram. Setelah token dipakai di bot dan diverifikasi, koneksi akan muncul di sini.
+        </div>
+      ) : (
+        <div style={{display:'flex', flexDirection:'column', gap:'0.75rem', marginTop:'1rem'}}>
+          {telegramConnections.map((connection) => (
+            <div key={connection.id} className="telegram-connection-item">
+              <div>
+                <div style={{display:'flex', alignItems:'center', gap:'0.5rem', flexWrap:'wrap'}}>
+                  <strong>{connection.label || `Chat ${connection.telegram_chat_id}`}</strong>
+                  {connection.is_primary && <span className="telegram-badge">Primary</span>}
+                  {connection.is_verified && <span className="telegram-badge telegram-badge-success">Verified</span>}
+                </div>
+                <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.35rem'}}>
+                  chat_id: {connection.telegram_chat_id} • type: {connection.chat_type}
+                </div>
+                <div style={{fontSize:'0.8rem', color:'var(--text-secondary)', marginTop:'0.25rem'}}>
+                  Terhubung {new Date(connection.linked_at || connection.created_at).toLocaleString('id-ID')}
+                </div>
+              </div>
+              <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap', justifyContent:'flex-end'}}>
+                {!connection.is_primary && (
+                  <button type="button" className="btn-primary" style={{color:'white', padding:'0.65rem 0.9rem'}} onClick={() => setPrimaryTelegramConnection(connection.id)}>
+                    Jadikan Primary
+                  </button>
+                )}
+                <button type="button" className="btn-danger" style={{padding:'0.65rem 0.9rem'}} onClick={() => unlinkTelegramConnection(connection.id)}>
+                  <Trash2 size={16} /> Unlink
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   // ==========================================
   // RENDER BLOCKS
@@ -1198,11 +1323,14 @@ function App() {
             </div>
           </div>
         ) : activeView === 'profile' ? (
-           <div className="widget-card" style={{maxWidth:'600px', margin:'0 auto', textAlign:'center', padding:'3rem'}}>
-             <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
-             <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
-             <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
-           </div>
+          <div style={{display:'flex', flexDirection:'column', gap:'1.5rem', maxWidth:'860px', margin:'0 auto'}}>
+            <div className="widget-card" style={{textAlign:'center', padding:'3rem'}}>
+              <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
+              <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
+              <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
+            </div>
+            {renderTelegramProfilePanel()}
+          </div>
         ) : null}
       </main>
     </>
@@ -1390,10 +1518,13 @@ function App() {
              </div>
            </div>
         ) : activeView === 'profile' ? (
-           <div style={{textAlign:'center', marginTop:'3rem'}}>
-             <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
-             <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
-             <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
+           <div style={{display:'flex', flexDirection:'column', gap:'1rem', paddingBottom:'2rem'}}>
+             <div className="widget-card" style={{textAlign:'center'}}>
+               <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
+               <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
+               <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
+             </div>
+             {renderTelegramProfilePanel()}
            </div>
         ) : null}
       </main>
@@ -1447,7 +1578,6 @@ function App() {
           <div className={`tab ${settingsTab === 'accounts' ? 'active' : ''}`} onClick={() => setSettingsTab('accounts')}>Accounts</div>
           <div className={`tab ${settingsTab === 'categories' ? 'active' : ''}`} onClick={() => setSettingsTab('categories')}>Budgets</div>
           <div className={`tab ${settingsTab === 'goals' ? 'active' : ''}`} onClick={() => setSettingsTab('goals')}>Goals</div>
-          <div className={`tab ${settingsTab === 'telegram' ? 'active' : ''}`} onClick={() => setSettingsTab('telegram')}>Telegram</div>
         </div>
         
         {settingsTab === 'accounts' && (
@@ -1522,122 +1652,7 @@ function App() {
           </div>
         )}
 
-        {settingsTab === 'telegram' && (
-          <div>
-            <div className="telegram-settings-card">
-              <div>
-                <div className="telegram-settings-title">Hubungkan Telegram</div>
-                <div className="telegram-settings-copy">
-                  Buat token dari sini, lalu kirim ke bot Telegram dengan format <strong>/start TOKEN</strong>.
-                  Satu akun bisa punya banyak koneksi, dan salah satunya bisa dijadikan primary.
-                </div>
-              </div>
-              <button type="button" className="btn-primary" onClick={generateTelegramLinkToken} disabled={isTelegramLoading} style={{color:'white'}}>
-                {isTelegramLoading ? 'Memproses...' : 'Generate Token'}
-              </button>
-            </div>
-
-            {telegramError && (
-              <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
-                {telegramError}
-              </div>
-            )}
-
-            {telegramSuccess && (
-              <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
-                {telegramSuccess}
-              </div>
-            )}
-
-            {telegramLinkToken && (
-              <div className="telegram-token-box">
-                <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginBottom:'0.4rem'}}>Token aktif</div>
-                <div className="telegram-token-value">{telegramLinkToken.token}</div>
-                <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.5rem'}}>
-                  Berlaku sampai {new Date(telegramLinkToken.expires_at).toLocaleString('id-ID')}
-                </div>
-                {telegramQrCode && (
-                  <div className="telegram-qr-section">
-                    <div className="telegram-qr-card">
-                      <img src={telegramQrCode} alt="QR code untuk menghubungkan Telegram" className="telegram-qr-image" />
-                    </div>
-                    <div style={{fontSize:'0.9rem', color:'var(--text-secondary)', lineHeight:'1.5'}}>
-                      {telegramStartLink ? (
-                        <>
-                          Scan QR ini untuk membuka bot Telegram dan meneruskan token secara otomatis.
-                          <div style={{marginTop:'0.5rem', wordBreak:'break-all'}}>
-                            <a href={telegramStartLink} target="_blank" rel="noreferrer" style={{color:'var(--accent-dark-green)', fontWeight:'600'}}>
-                              Buka bot Telegram
-                            </a>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          QR masih berisi token mentah karena username bot belum diatur.
-                          Tambahkan `VITE_TELEGRAM_BOT_USERNAME` agar scan langsung membuka bot Telegram.
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="telegram-settings-card" style={{marginTop:'1rem'}}>
-              <div>
-                <div className="telegram-settings-title">Koneksi Saat Ini</div>
-                <div className="telegram-settings-copy">
-                  Workflow `n8n` akan memakai `telegram_chat_id` yang sudah terhubung di sini untuk menentukan transaksi masuk ke user yang benar.
-                </div>
-              </div>
-              <button type="button" className="btn-primary" onClick={fetchTelegramConnections} disabled={isTelegramLoading} style={{color:'white'}}>
-                Refresh
-              </button>
-            </div>
-
-            {isTelegramLoading && telegramConnections.length === 0 ? (
-              <div style={{color:'var(--text-secondary)', marginTop:'1rem'}}>Memuat koneksi Telegram...</div>
-            ) : telegramConnections.length === 0 ? (
-              <div className="telegram-empty-state">
-                Belum ada koneksi Telegram. Setelah token dikirim ke bot dan diverifikasi, koneksi akan muncul di sini.
-              </div>
-            ) : (
-              <div style={{display:'flex', flexDirection:'column', gap:'0.75rem', marginTop:'1rem'}}>
-                {telegramConnections.map((connection) => (
-                  <div key={connection.id} className="telegram-connection-item">
-                    <div>
-                      <div style={{display:'flex', alignItems:'center', gap:'0.5rem', flexWrap:'wrap'}}>
-                        <strong>{connection.label || `Chat ${connection.telegram_chat_id}`}</strong>
-                        {connection.is_primary && <span className="telegram-badge">Primary</span>}
-                        {connection.is_verified && <span className="telegram-badge telegram-badge-success">Verified</span>}
-                      </div>
-                      <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.35rem'}}>
-                        chat_id: {connection.telegram_chat_id} • type: {connection.chat_type}
-                      </div>
-                      <div style={{fontSize:'0.8rem', color:'var(--text-secondary)', marginTop:'0.25rem'}}>
-                        Terhubung {new Date(connection.linked_at || connection.created_at).toLocaleString('id-ID')}
-                      </div>
-                    </div>
-                    <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap', justifyContent:'flex-end'}}>
-                      {!connection.is_primary && (
-                        <button type="button" className="btn-primary" style={{color:'white', padding:'0.65rem 0.9rem'}} onClick={() => setPrimaryTelegramConnection(connection.id)}>
-                          Jadikan Primary
-                        </button>
-                      )}
-                      <button type="button" className="btn-danger" style={{padding:'0.65rem 0.9rem'}} onClick={() => unlinkTelegramConnection(connection.id)}>
-                        <Trash2 size={16} /> Unlink
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {settingsTab !== 'telegram' && (
-          <button className="btn-primary" style={{width: '100%', marginTop:'2rem', padding:'1rem', color:'white'}} onClick={saveSettings}>Save to Supabase</button>
-        )}
+        <button className="btn-primary" style={{width: '100%', marginTop:'2rem', padding:'1rem', color:'white'}} onClick={saveSettings}>Save to Supabase</button>
       </div>
     </div>
   );
