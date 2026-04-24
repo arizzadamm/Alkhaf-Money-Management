@@ -1,28 +1,28 @@
 :root {
-  /* ========================================= */
-  /* TEMA DESKTOP (TAMPILAN LAMA YANG KLASIK)  */
-  /* ========================================= */
-  --bg-main: #f8fafc;
-  --bg-card: #ffffff;
-  --bg-sidebar: #ffffff;
-  --bg-input: #f1f5f9;
-  
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  
-  --border-color: #e2e8f0;
-  --hover-bg: #f8fafc;
-  
-  --accent-lime: #d2f411;
-  --accent-dark-green: #213f31;
-  --accent-blue-gray: #2d5866;
-  
+  --primary: #213F31;
+  --accent: #D2F411;
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
+  --border: #E2E8F0;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --bg-main: var(--bg);
+  --bg-card: var(--surface);
+  --bg-sidebar: var(--surface);
+  --bg-input: #F1F5F9;
+  --border-color: var(--border);
+  --hover-bg: #F1F5F9;
+  --accent-lime: var(--accent);
+  --accent-dark-green: var(--primary);
+  --accent-blue-gray: #2D5866;
   --success: #10b981;
   --danger: #ef4444;
   --danger-light: #fee2e2;
-  
-  --border-radius-lg: 20px;
-  --border-radius-md: 12px;
+  --border-radius-lg: var(--radius-lg);
+  --border-radius-md: var(--radius-md);
 }
 
 [data-theme="dark"] {
@@ -51,12 +51,12 @@
   /* TEMA MOBILE (TAMPILAN BARU SESUAI MOCKUP) */
   /* ========================================= */
   :root {
-    --bg-main: #f5f6f1; /* Cream */
-    --accent-lime: #c7e436;
-    --accent-dark-green: #1a3628;
+    --bg-main: var(--bg);
+    --accent-lime: var(--accent);
+    --accent-dark-green: var(--primary);
     --accent-blue-gray: #334155;
-    --border-radius-lg: 24px;
-    --border-radius-md: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-md: 14px;
   }
 }
 
@@ -67,8 +67,29 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--bg-main);
+  font-family: Inter, system-ui, sans-serif;
+  background: var(--bg);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+}
+
+.button-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.button-accent {
+  background: var(--accent);
+  color: #0F172A;
+}
+
+input {
+  background: #F1F5F9;
+  border-radius: var(--radius-md);
 }

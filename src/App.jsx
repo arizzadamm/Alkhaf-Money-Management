@@ -677,7 +677,7 @@ function App() {
     });
     const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.setAttribute('href', url); a.setAttribute('download', `FinFlow_Transactions_${viewMonthName.replace(/\s+/g, '_')}.csv`);
+    const a = document.createElement('a'); a.setAttribute('href', url); a.setAttribute('download', `AlkaFlow_Transactions_${viewMonthName.replace(/\s+/g, '_')}.csv`);
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
@@ -775,9 +775,9 @@ function App() {
     return (
       <div className="login-screen">
         <div className="login-card">
-          <div className="login-logo">AF</div>
-          <h1 style={{fontSize:'1.8rem', fontWeight:'700', marginBottom:'0.5rem'}}>Welcome to Alkhaf</h1>
-          <p style={{color:'var(--text-secondary)', marginBottom:'2rem'}}>Please sign in to your zero-based budgeting dashboard.</p>
+          <div className="login-logo">AlkaFlow</div>
+          <h1 style={{fontSize:'2rem', fontWeight:'800', marginBottom:'0.5rem', letterSpacing:'-0.03em'}}>Welcome back</h1>
+          <p style={{color:'var(--text-secondary)', marginBottom:'2rem', lineHeight:'1.7'}}>Track your money effortlessly - just by chatting. Secure. Private. Encrypted.</p>
           <form onSubmit={handleLogin}>
             {loginError && (<div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>{loginError}</div>)}
             <div style={{marginBottom:'1.5rem', textAlign:'left'}}>
@@ -792,7 +792,7 @@ function App() {
               <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
               Remember me
             </label>
-            <button type="submit" className="btn-primary" style={{width:'100%', padding:'1rem'}}>Sign In to FinFlow</button>
+            <button type="submit" className="btn-primary" style={{width:'100%', padding:'1rem'}}>Sign In to AlkaFlow</button>
           </form>
         </div>
       </div>
@@ -804,7 +804,7 @@ function App() {
     <>
       <aside className="sidebar">
         <div>
-          <div className="logo"><div className="logo-icon">AF</div> Alkhaf</div>
+          <div className="logo"><div className="logo-icon">AF</div> AlkaFlow</div>
           <div className="nav-links">
             {isAdmin ? (
               <div className={`nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}><Users size={20} /> User Management</div>
@@ -846,8 +846,8 @@ function App() {
           <div className="page-title">
             {activeView === 'home' && `Overview - ${viewMonthName}`}
             {activeView === 'transactions' && `Transactions for ${viewMonthName}`}
-            {activeView === 'admin' && 'Admin Back Office'}
-            {activeView === 'profile' && `Your Profile`}
+            {activeView === 'admin' && 'AlkaFlow Admin'}
+            {activeView === 'profile' && `Your Account`}
           </div>
           <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
             <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={toggleTheme}>
@@ -873,7 +873,7 @@ function App() {
           <>
             <div style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'2rem', color:'white', marginBottom:'1.5rem', display:'flex', gap:'2rem', alignItems:'center', flexWrap:'wrap'}}>
                <div style={{flex:1, minWidth:'250px'}}>
-                 <h3 style={{fontSize:'1.5rem', fontWeight:'500', marginBottom:'0.5rem'}}>Financial Planning</h3>
+                 <h3 style={{fontSize:'1.5rem', fontWeight:'700', marginBottom:'0.5rem', letterSpacing:'-0.02em'}}>Money Overview</h3>
                  <p style={{opacity:0.8}}>Total Pool: {formatIDR(effectiveTotalIncome)}</p>
                </div>
                <div style={{display:'flex', gap:'1rem'}}>
@@ -1277,8 +1277,8 @@ function App() {
                 <div className="promo-banner">
                   <div className="promo-icon"><CreditCard size={20} color="white"/></div>
                   <div>
-                    <div className="promo-title">Connect Your Card</div>
-                    <div className="promo-subtitle">The smarter way to pay your money</div>
+                    <div className="promo-title">Telegram Auto Tracking</div>
+                    <div className="promo-subtitle">Track your finances as easily as sending a message.</div>
                   </div>
                   <div className="promo-arrow"><ChevronRight size={20}/></div>
                 </div>
@@ -1340,8 +1340,8 @@ function App() {
         ) : activeView === 'admin' ? (
            <div style={{display:'flex', flexDirection:'column', gap:'1rem', paddingBottom:'2rem'}}>
              <div className="widget-card">
-               <h2 style={{fontSize:'1.4rem', fontWeight:'700', marginBottom:'0.5rem'}}>Admin Back Office</h2>
-               <p style={{color:'var(--text-secondary)', marginBottom:'1rem'}}>Kelola user aplikasi dari satu tempat.</p>
+               <h2 style={{fontSize:'1.4rem', fontWeight:'700', marginBottom:'0.5rem'}}>AlkaFlow Admin</h2>
+               <p style={{color:'var(--text-secondary)', marginBottom:'1rem'}}>Kelola user aplikasi dari satu tempat dengan kontrol yang rapi dan aman.</p>
                {adminError && <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminError}</div>}
                {adminSuccess && <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminSuccess}</div>}
                <form onSubmit={handleAdminUserSubmit} key={editingAdminUserId || 'mobile-new-user-form'} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
