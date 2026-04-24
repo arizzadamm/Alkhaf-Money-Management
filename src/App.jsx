@@ -1516,20 +1516,97 @@ function App() {
             </div>
           </>
         ) : activeView === 'transactions' ? (
-          <div style={{paddingBottom:'2rem'}}>
-             <h2 style={{marginBottom:'1rem'}}>Transactions</h2>
-             <table className="full-transactions-table">
-               {/* Same as desktop but mobile scrolling handled in CSS */}
-                <tbody>
-                  {filteredTransactions.map(tx => (
-                    <tr key={tx.id}>
-                      <td style={{color:'var(--text-secondary)'}}>{tx.date}</td>
-                      <td>{tx.name}</td>
-                      <td style={{textAlign:'right', color: tx.category === 'Income' ? 'var(--success)' : 'inherit'}}>{formatIDR(tx.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-             </table>
+          <div className="mobile-transactions-page">
+             <div className="mobile-transactions-header">
+               <div>
+                 <h2 className="mobile-transactions-title">Transactions</h2>
+                 <p className="mobile-transactions-subtitle">{filteredTransactions.length} transaksi di {viewMonthName}</p>
+               </div>
+               <button type="button" className="mobile-transactions-export" onClick={exportToCSV}>
+                 <Download size={18} />
+                 Export
+               </button>
+             </div>
+
+             <div className="mobile-transaction-actions">
+               <button type="button" className="mobile-transaction-action action-income" onClick={() => setIsTopUpOpen(true)}>
+                 <ArrowUpRight size={18} />
+                 Top Up
+               </button>
+               <button type="button" className="mobile-transaction-action action-expense" onClick={() => setIsAddOpen(true)}>
+                 <Plus size={18} />
+                 Expense
+               </button>
+               <button type="button" className="mobile-transaction-action action-transfer" onClick={() => setIsTransferOpen(true)}>
+                 <ArrowRightLeft size={18} />
+                 Transfer
+               </button>
+             </div>
+
+             <div className="mobile-transactions-list">
+               {filteredTransactions.length === 0 ? (
+                 <div className="mobile-transactions-empty">Belum ada transaksi di periode ini.</div>
+               ) : (
+                 filteredTransactions.map((tx, i) => (
+                   <article key={tx.id} className="mobile-transaction-card">
+                     <div className="mobile-transaction-main">
+                       <div
+                         className="transaction-avatar"
+                         style={{
+                           background:
+                             tx.category === 'Income'
+                               ? 'var(--success)'
+                               : tx.category.includes('Transfer')
+                                 ? 'var(--accent-blue-gray)'
+                                 : `hsl(${i * 60 + 10}, 70%, 50%)`
+                         }}
+                       >
+                         {getInitial(tx.name.replace('Transfer to ', '').replace('Transfer from ', ''))}
+                       </div>
+                       <div className="mobile-transaction-copy">
+                         <div className="mobile-transaction-topline">
+                           <span className={`transaction-name ${tx.isPaid ? 'paid' : ''}`}>{tx.name}</span>
+                           <span className={`transaction-amount ${tx.category === 'Income' || tx.category === 'Transfer In' ? 'income' : 'expense'}`}>
+                             {tx.category === 'Income' || tx.category === 'Transfer In' ? '+' : '-'} {formatIDR(tx.amount)}
+                           </span>
+                         </div>
+                         <div className="mobile-transaction-meta">
+                           <span>{tx.date}</span>
+                           <span>{tx.account}</span>
+                           <span>{tx.category}</span>
+                         </div>
+                       </div>
+                     </div>
+                     <div className="mobile-transaction-controls">
+                       {tx.category === 'Income' || tx.category.includes('Transfer') ? (
+                         <span className="mobile-transaction-status success">
+                           <CheckCircle2 size={16} />
+                           Completed
+                         </span>
+                       ) : (
+                         <label className="mobile-transaction-toggle">
+                           <input
+                             type="checkbox"
+                             className="custom-checkbox"
+                             checked={tx.isPaid}
+                             onChange={() => togglePaid(tx.id, tx.isPaid)}
+                           />
+                           <span>{tx.isPaid ? 'Paid' : 'Mark paid'}</span>
+                         </label>
+                       )}
+                       <button
+                         type="button"
+                         className="mobile-transaction-delete"
+                         onClick={() => removeTransaction(tx.id)}
+                         aria-label={`Delete ${tx.name}`}
+                       >
+                         <Trash2 size={16} />
+                       </button>
+                     </div>
+                   </article>
+                 ))
+               )}
+             </div>
           </div>
         ) : activeView === 'admin' ? (
            <div style={{display:'flex', flexDirection:'column', gap:'1rem', paddingBottom:'2rem'}}>
