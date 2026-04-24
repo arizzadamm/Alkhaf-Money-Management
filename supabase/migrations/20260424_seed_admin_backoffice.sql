@@ -6,7 +6,7 @@ set role = 'user'
 where role is null or trim(role) = '';
 
 insert into public.app_users (username, password, role)
-select 'admin', 'admin123', 'admin'
+select 'admin', 'sha256:240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'admin'
 where not exists (
   select 1
   from public.app_users

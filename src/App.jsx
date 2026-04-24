@@ -13,6 +13,18 @@ const formatIDR = (amount) => {
 };
 
 const getInitial = (name) => name ? name.charAt(0).toUpperCase() : '?';
+const SESSION_STORAGE_KEY = 'alkhaf_user_session';
+const REMEMBER_ME_KEY = 'alkhaf_remember_me';
+
+const hashPassword = async (password) => {
+  const bytes = new TextEncoder().encode(password);
+  const buffer = await window.crypto.subtle.digest('SHA-256', bytes);
+  const hash = Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+
+  return `sha256:${hash}`;
+};
 
 const CHART_COLORS = ['#d2f411', '#213f31', '#2d5866', '#f59e0b', '#ec4899', '#8b5cf6', '#34d399', '#f87171'];
 
@@ -28,6 +40,7 @@ function App() {
   const [activeView, setActiveView] = useState('home');
   const [isLoading, setIsLoading] = useState(true);
   const [loginError, setLoginError] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [adminError, setAdminError] = useState('');
   const [adminSuccess, setAdminSuccess] = useState('');
   
@@ -83,12 +96,15 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const savedSession = localStorage.getItem('alkhaf_user_session');
+    const savedSession = localStorage.getItem(SESSION_STORAGE_KEY) || sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (savedSession) {
       const parsedUser = JSON.parse(savedSession);
       setUser(parsedUser);
       setActiveView(parsedUser.role === 'admin' ? 'admin' : 'home');
     }
+
+    const savedRememberMe = localStorage.getItem(REMEMBER_ME_KEY);
+    if (savedRememberMe !== null) setRememberMe(savedRememberMe === 'true');
 
     const savedTheme = localStorage.getItem('alkhaf_theme');
     if (savedTheme === 'dark') {
@@ -223,15 +239,46 @@ function App() {
     setLoginError('');
     const username = e.target.username.value;
     const password = e.target.password.value;
+    const passwordHash = await hashPassword(password);
 
     try {
-      const { data, error } = await supabase.from('app_users').select('*').eq('username', username).eq('password', password).single();
+      let { data, error } = await supabase
+        .from('app_users')
+        .select('*')
+        .eq('username', username)
+        .eq('password', passwordHash)
+        .single();
+
+      if (error || !data) {
+        const legacyLogin = await supabase
+          .from('app_users')
+          .select('*')
+          .eq('username', username)
+          .eq('password', password)
+          .single();
+
+        data = legacyLogin.data;
+        error = legacyLogin.error;
+
+        if (data) {
+          await supabase.from('app_users').update({ password: passwordHash }).eq('id', data.id);
+        }
+      }
+
       if (error || !data) return setLoginError('Username atau Password salah!');
 
       const userData = { id: data.id, name: data.username, role: data.role };
       setUser(userData);
       setActiveView(data.role === 'admin' ? 'admin' : 'home');
-      localStorage.setItem('alkhaf_user_session', JSON.stringify(userData));
+      localStorage.setItem(REMEMBER_ME_KEY, String(rememberMe));
+
+      if (rememberMe) {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } else {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      }
     } catch (err) {
       setLoginError('Terjadi kesalahan koneksi database.');
     }
@@ -250,7 +297,8 @@ function App() {
     setGlobalTransactions([]);
     setAdminUsers([]);
     setEditingAdminUserId(null);
-    localStorage.removeItem('alkhaf_user_session');
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
   };
 
   const fetchAdminUsers = async () => {
@@ -411,7 +459,7 @@ function App() {
     }
 
     const payload = { username, role };
-    if (password) payload.password = password;
+    if (password) payload.password = await hashPassword(password);
 
     let result;
     if (id) {
@@ -427,7 +475,6 @@ function App() {
 
     setAdminSuccess(id ? 'User berhasil diperbarui.' : 'User baru berhasil dibuat.');
     setEditingAdminUserId(null);
-    e.currentTarget.reset();
     await fetchAdminUsers();
   };
 
@@ -436,10 +483,9 @@ function App() {
     resetAdminFeedback();
   };
 
-  const cancelEditAdminUser = (form) => {
+  const cancelEditAdminUser = () => {
     setEditingAdminUserId(null);
     resetAdminFeedback();
-    form?.reset();
   };
 
   const deleteAdminUser = async (id) => {
@@ -544,6 +590,10 @@ function App() {
               <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Password</label>
               <input type="password" name="password" required className="form-input" placeholder="••••••••" />
             </div>
+            <label style={{display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem', color:'var(--text-secondary)', fontSize:'0.9rem', cursor:'pointer'}}>
+              <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+              Remember me
+            </label>
             <button type="submit" className="btn-primary" style={{width:'100%', padding:'1rem'}}>Sign In to FinFlow</button>
           </form>
         </div>
@@ -886,7 +936,7 @@ function App() {
                     <button
                       type="button"
                       className="btn-danger"
-                      onClick={(event) => cancelEditAdminUser(event.currentTarget.form)}
+                      onClick={cancelEditAdminUser}
                       style={{justifyContent:'center'}}
                     >
                       Cancel Edit
