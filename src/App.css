@@ -72,18 +72,117 @@
 .search-bar input { border: none; outline: none; background: transparent; width: 100%; color: var(--text-primary); }
 .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
 .widget-card { background-color: var(--surface); border-radius: var(--border-radius-lg); padding: 1.5rem; box-shadow: 0 10px 20px rgba(0,0,0,0.05); border: 1px solid rgba(226, 232, 240, 0.9); }
+.widget-card:hover,
+.bank-card:hover,
+.transaction-item-card:hover {
+  transform: translateY(-2px);
+  transition: 0.2s ease;
+}
 .widget-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
 .widget-title { font-size: 1.1rem; font-weight: 600; }
 .see-all { color: var(--text-secondary); font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 0.25rem; cursor: pointer; }
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #213F31, #1A3628);
+  color: white;
+  box-shadow: 0 24px 48px rgba(33, 63, 49, 0.22);
+}
+.hero-card-pattern {
+  position: absolute;
+  inset: auto -10% -45% auto;
+  width: 22rem;
+  height: 22rem;
+  background:
+    radial-gradient(circle at center, rgba(210, 244, 17, 0.16) 0, rgba(210, 244, 17, 0.06) 28%, transparent 60%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.hero-card-copy,
+.hero-card-metric {
+  position: relative;
+  z-index: 1;
+}
+.hero-card-copy {
+  flex: 1;
+  min-width: 260px;
+}
+.hero-card-eyebrow {
+  color: rgba(210, 244, 17, 0.9);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+.hero-card-title {
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin-bottom: 0.75rem;
+}
+.hero-card-subtitle {
+  max-width: 32rem;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.7;
+}
+.hero-card-metric {
+  min-width: 220px;
+  padding: 1.25rem 1.5rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.hero-card-metric-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 0.35rem;
+}
+.hero-card-metric-value {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin-bottom: 0.4rem;
+}
+.hero-card-metric-trend {
+  color: var(--accent);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.money-overview-card {
+  position: relative;
+  box-shadow: 0 20px 40px rgba(33, 63, 49, 0.18);
+}
+.money-overview-subtitle {
+  opacity: 0.88;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 500;
+}
+.money-overview-timeline span[style*='var(--accent-lime)'] {
+  color: var(--accent) !important;
+}
 
 /* Desktop Bank Card */
 .cards-container { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-width: none; }
 .cards-container::-webkit-scrollbar { display: none; }
-.bank-card { min-width: 220px; height: 140px; border-radius: var(--border-radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; color: white; position: relative; overflow: hidden; }
+.bank-card { min-width: 220px; height: 140px; border-radius: var(--border-radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; color: white; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 18px 36px rgba(15,23,42,0.08); transition: transform 0.2s ease, box-shadow 0.2s ease; }
 .bank-card.color-0 { background-color: var(--accent-lime); color: #0f172a; }
 .bank-card.color-1 { background-color: var(--accent-dark-green); color: white;}
 .bank-card.color-2 { background-color: var(--accent-blue-gray); color: white;}
 .bank-card.color-3 { background-color: #eab308; color: white;}
+.bank-card-primary { background: linear-gradient(135deg, #213F31, #1A3628) !important; color: white !important; }
+.bank-card-accent { background: linear-gradient(135deg, #D2F411, #BBDD19) !important; color: #0F172A !important; }
+.bank-card-muted { background: linear-gradient(135deg, #2D5866, #64748B) !important; color: white !important; }
 .bank-card-type { font-size: 0.85rem; font-weight: 500; }
 .bank-card-number { font-size: 1.25rem; font-weight: 600; letter-spacing: 2px; }
 .bank-card-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
@@ -92,17 +191,20 @@
 
 /* Desktop Actions */
 .actions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-.action-btn { background-color: var(--bg-main); border: none; border-radius: var(--border-radius-md); padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; cursor: pointer; transition: transform 0.2s; font-weight: 500; font-size: 0.9rem; color: var(--text-primary); }
-.action-btn:hover { transform: translateY(-2px); }
-.action-icon { width: 40px; height: 40px; background-color: var(--bg-card); border-radius: 50%; display: grid; place-content: center; }
+.action-btn { background-color: var(--bg-main); border: 1px solid var(--border-color); border-radius: 18px; padding: 1.1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.65rem; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s; font-weight: 600; font-size: 0.9rem; color: var(--text-primary); min-height: 116px; }
+.action-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08); opacity: 0.95; }
+.action-icon { width: 44px; height: 44px; background-color: var(--surface); border-radius: 14px; display: grid; place-content: center; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06); }
 
 /* Desktop Chart */
 .spending-amount { font-size: 3rem; font-weight: 800; margin-bottom: 0.5rem; letter-spacing: -0.03em; }
 .spending-trend { font-size: 0.85rem; color: var(--text-secondary); }
+.chart-card .widget-title { font-weight: 700; }
 
 /* Transactions */
 .transaction-list { display: flex; flex-direction: column; gap: 1.25rem; }
 .transaction-item { display: flex; align-items: center; justify-content: space-between; }
+.transaction-item-card { padding: 0.9rem 0.25rem; border-bottom: 1px solid rgba(226, 232, 240, 0.8); }
+.transaction-item-card:last-child { border-bottom: none; }
 .transaction-left { display: flex; align-items: center; gap: 1rem; }
 .transaction-avatar { width: 48px; height: 48px; border-radius: 50%; display: grid; place-content: center; color: white; font-weight: 600; font-size: 1.2rem; }
 .transaction-details { display: flex; flex-direction: column; }
@@ -110,10 +212,10 @@
 .transaction-name.paid { text-decoration: line-through; color: var(--text-secondary); }
 .transaction-date { font-size: 0.8rem; color: var(--text-secondary); }
 .transaction-right { text-align: right; }
-.transaction-amount { font-weight: 600; font-size: 1.1rem; }
-.transaction-amount.expense { color: var(--text-primary); }
+.transaction-amount { font-weight: 800; font-size: 1.15rem; }
+.transaction-amount.expense { color: #dc2626; }
 .transaction-amount.income { color: var(--success); }
-.transaction-category { font-size: 0.8rem; color: var(--text-secondary); }
+.transaction-category { font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; }
 .full-transactions-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .full-transactions-table th { text-align: left; padding: 1rem; border-bottom: 2px solid var(--bg-main); color: var(--text-secondary); font-weight: 500; }
 .full-transactions-table td { padding: 1rem; border-bottom: 1px solid var(--bg-main); vertical-align: middle; }
@@ -126,6 +228,9 @@
   .app-layout { flex-direction: column; }
   .main-content { padding: 1.5rem; height: calc(100vh - 80px); }
   .dashboard-grid { grid-template-columns: 1fr; }
+  .hero-card { padding: 1.5rem; gap: 1.25rem; }
+  .hero-card-title { font-size: 1.65rem; }
+  .hero-card-metric { width: 100%; }
   
   /* Mobile Header */
   .mobile-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; }

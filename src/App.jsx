@@ -29,7 +29,7 @@ const hashPassword = async (password) => {
   return `sha256:${hash}`;
 };
 
-const CHART_COLORS = ['#d2f411', '#213f31', '#2d5866', '#f59e0b', '#ec4899', '#8b5cf6', '#34d399', '#f87171'];
+const CHART_COLORS = ['#d2f411', '#213f31', '#2d5866', '#94a3b8', '#cbd5e1', '#86efac', '#bbf7d0', '#e2e8f0'];
 
 function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -871,12 +871,26 @@ function App() {
            <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'50vh', color:'var(--text-secondary)'}}>{isAdmin ? 'Loading admin data...' : `Loading ${viewMonthName} data...`}</div>
         ) : activeView === 'home' ? (
           <>
-            <div style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'2rem', color:'white', marginBottom:'1.5rem', display:'flex', gap:'2rem', alignItems:'center', flexWrap:'wrap'}}>
+            <div className="hero-card">
+              <div className="hero-card-pattern"></div>
+              <div className="hero-card-copy">
+                <div className="hero-card-eyebrow">AlkaFlow</div>
+                <h2 className="hero-card-title">Your Financial Flow</h2>
+                <p className="hero-card-subtitle">Track income and expenses automatically from Telegram.</p>
+              </div>
+              <div className="hero-card-metric">
+                <div className="hero-card-metric-label">Total Balance</div>
+                <div className="hero-card-metric-value">{formatIDR(totalBalance)}</div>
+                <div className="hero-card-metric-trend">+5.8% this month</div>
+              </div>
+            </div>
+
+            <div className="money-overview-card" style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'2rem', color:'white', marginBottom:'1.5rem', display:'flex', gap:'2rem', alignItems:'center', flexWrap:'wrap'}}>
                <div style={{flex:1, minWidth:'250px'}}>
                  <h3 style={{fontSize:'1.5rem', fontWeight:'700', marginBottom:'0.5rem', letterSpacing:'-0.02em'}}>Money Overview</h3>
-                 <p style={{opacity:0.8}}>Total Pool: {formatIDR(effectiveTotalIncome)}</p>
+                 <p className="money-overview-subtitle">Total Pool: {formatIDR(effectiveTotalIncome)}</p>
                </div>
-               <div style={{display:'flex', gap:'1rem'}}>
+               <div className="money-overview-timeline" style={{display:'flex', gap:'1rem'}}>
                  {timelineMonths.map((item, i) => {
                     const isCurrent = item.offset === monthOffset;
                     return (
@@ -902,7 +916,7 @@ function App() {
                   <div className="cards-container">
                     {accounts.length === 0 && <span style={{color:'var(--text-secondary)'}}>No accounts yet.</span>}
                     {accounts.map((acc, index) => (
-                      <div key={acc.id} className={`bank-card color-${index % 4}`}>
+                      <div key={acc.id} className={`bank-card color-${index % 4} ${index === 0 ? 'bank-card-primary' : index === 1 ? 'bank-card-accent' : 'bank-card-muted'}`}>
                         <div style={{display:'flex', justifyContent:'space-between'}}>
                           <span className="bank-card-type">{acc.name}</span>
                           <span style={{fontWeight:'700', fontStyle:'italic'}}>BANK</span>
@@ -921,7 +935,7 @@ function App() {
                 </div>
 
                 <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'1.5rem'}}>
-                  <div className="widget-card">
+                  <div className="widget-card action-panel-card">
                     <div className="widget-header"><span className="widget-title">Actions</span></div>
                     <div className="actions-grid">
                       <button className="action-btn" onClick={() => setIsAddOpen(true)}>
@@ -947,7 +961,7 @@ function App() {
                     <div className="transaction-list">
                       {filteredTransactions.length === 0 && <span style={{color:'var(--text-secondary)'}}>No transactions found.</span>}
                       {filteredTransactions.slice(0, 4).map((tx, i) => (
-                        <div key={tx.id} className="transaction-item">
+                        <div key={tx.id} className="transaction-item transaction-item-card">
                           <div className="transaction-left">
                             <div className="transaction-avatar" style={{background: tx.category === 'Income' ? 'var(--success)' : tx.category.includes('Transfer') ? 'var(--accent-blue-gray)' : `hsl(${i * 60 + 10}, 70%, 50%)`}}>
                               {getInitial(tx.name.replace('Transfer to ', '').replace('Transfer from ', ''))}
@@ -1008,7 +1022,7 @@ function App() {
                   </div>
                 </div>
 
-                <div className="widget-card" style={{display:'flex', flexDirection:'column', justifyContent:'center'}}>
+                <div className="widget-card chart-card" style={{display:'flex', flexDirection:'column', justifyContent:'center'}}>
                   <div className="widget-header" style={{marginBottom:'0.5rem'}}>
                     <span className="widget-title" style={{color:'var(--text-secondary)', fontWeight:'500'}}>Total Allocated</span>
                     <div style={{background:'var(--danger-light)', padding:'0.5rem', borderRadius:'50%'}}><ArrowDownRight size={16} color="var(--danger)"/></div>
