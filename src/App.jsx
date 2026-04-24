@@ -19,6 +19,49 @@ const REMEMBER_ME_KEY = 'alkhaf_remember_me';
 const SESSION_PROOF_KEY = 'alkhaf_session_proof';
 const TELEGRAM_BOT_USERNAME = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').replace(/^@+/, '').trim();
 
+const AlkaFlowLogoMark = ({ size = 72, className = '' }) => (
+  <svg
+    className={className}
+    width={size}
+    height={size}
+    viewBox="0 0 120 120"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <defs>
+      <linearGradient id="alkaflowArcDark" x1="18" y1="92" x2="78" y2="24" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#7EA43C" />
+        <stop offset="0.45" stopColor="#1B5B3D" />
+        <stop offset="1" stopColor="#0E3426" />
+      </linearGradient>
+      <linearGradient id="alkaflowArcLime" x1="82" y1="18" x2="98" y2="76" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#F1FF63" />
+        <stop offset="1" stopColor="#D2F411" />
+      </linearGradient>
+      <linearGradient id="alkaflowArcOlive" x1="22" y1="48" x2="52" y2="102" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#C4DD5D" />
+        <stop offset="1" stopColor="#5D8932" />
+      </linearGradient>
+      <linearGradient id="alkaflowArcDeep" x1="76" y1="82" x2="100" y2="38" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#14503A" />
+        <stop offset="1" stopColor="#0A2C20" />
+      </linearGradient>
+    </defs>
+    <circle cx="60" cy="60" r="37" fill="none" stroke="url(#alkaflowArcDark)" strokeWidth="22" strokeLinecap="round" strokeDasharray="112 260" transform="rotate(132 60 60)" />
+    <circle cx="60" cy="60" r="37" fill="none" stroke="url(#alkaflowArcLime)" strokeWidth="22" strokeLinecap="round" strokeDasharray="74 298" transform="rotate(-44 60 60)" />
+    <circle cx="60" cy="60" r="37" fill="none" stroke="url(#alkaflowArcOlive)" strokeWidth="22" strokeLinecap="round" strokeDasharray="58 314" transform="rotate(170 60 60)" />
+    <circle cx="60" cy="60" r="37" fill="none" stroke="url(#alkaflowArcDeep)" strokeWidth="22" strokeLinecap="round" strokeDasharray="86 286" transform="rotate(48 60 60)" opacity="0.92" />
+  </svg>
+);
+
+const AlkaFlowWordmark = ({ compact = false }) => (
+  <div className={`alkaflow-wordmark${compact ? ' compact' : ''}`}>
+    <span className="alkaflow-wordmark-primary">Alka</span>
+    <span className="alkaflow-wordmark-accent">Flow</span>
+  </div>
+);
+
 const hashPassword = async (password) => {
   const bytes = new TextEncoder().encode(password);
   const buffer = await window.crypto.subtle.digest('SHA-256', bytes);
@@ -154,46 +197,46 @@ function App() {
         return;
       }
 
-      fetchSettings();
-      fetchTransactions(); 
-      fetchGlobalTransactions();
-
-      const txSub = supabase
-        .channel(`public:expenses:user-${user.id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${user.id}` }, () => {
-          fetchTransactions();
-          fetchGlobalTransactions();
-        })
-        .subscribe();
-
-      const settingsSub = supabase
-        .channel(`public:app_settings:user-${user.id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings', filter: `user_id=eq.${user.id}` }, () => {
-          fetchSettings();
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(txSub);
-        supabase.removeChannel(settingsSub);
-      };
+      Promise.all([
+        fetchSettings(),
+        fetchTransactions(),
+        fetchGlobalTransactions()
+      ]).finally(() => setIsLoading(false));
     }
   }, [user, monthOffset]);
+
+  const invokeFinanceAction = async (action, payload = {}) => {
+    if (!user?.id) return { error: 'User tidak ditemukan.' };
+
+    const sessionProof = getStoredSessionProof();
+    if (!sessionProof) return { error: 'Sesi tidak ditemukan. Silakan login ulang.' };
+
+    const { data, error } = await supabase.functions.invoke('user-finance', {
+      body: {
+        action,
+        requesterId: user.id,
+        sessionProof,
+        ...payload
+      }
+    });
+
+    if (error || data?.error) {
+      return { error: data?.error || error?.message || 'Gagal memproses data keuangan.' };
+    }
+
+    return { data: data?.data };
+  };
 
   const fetchSettings = async () => {
     if (!user?.id) return;
 
-    const { data, error } = await supabase
-      .from('app_settings')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Failed to fetch settings:', error);
+    const result = await invokeFinanceAction('get_settings');
+    if (result.error) {
+      console.error('Failed to fetch settings:', result.error);
       return;
     }
 
+    const data = result.data;
     if (data) {
       setBaseTotalIncome(Number(data.total_income) || 0);
       setAccounts(data.accounts || []);
@@ -210,48 +253,31 @@ function App() {
   const fetchTransactions = async () => {
     if (!user?.id) return;
 
-    let { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('budget_month', activeBudgetMonth)
-      .order('created_at', { ascending: false });
-
-    if (error && error.message.includes('budget_month')) {
-      const startOfMonth = new Date(getReferenceDate.getFullYear(), getReferenceDate.getMonth(), 1).toISOString();
-      const endOfMonth = new Date(getReferenceDate.getFullYear(), getReferenceDate.getMonth() + 1, 0, 23, 59, 59).toISOString();
-      const fallback = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('created_at', startOfMonth)
-        .lte('created_at', endOfMonth)
-        .order('created_at', { ascending: false });
-      
-      data = fallback.data;
-      error = fallback.error;
+    const result = await invokeFinanceAction('list_transactions', {
+      budgetMonth: activeBudgetMonth
+    });
+    if (result.error) {
+      console.error('Failed to fetch transactions:', result.error);
+      return;
     }
 
+    const data = result.data || [];
     if (data) {
       const mapped = data.map(d => ({ ...d, isPaid: d.is_paid }));
       setTransactions(mapped);
     }
-    setIsLoading(false);
   };
 
   const fetchGlobalTransactions = async () => {
     if (!user?.id) return;
 
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('amount, category, account, is_paid')
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Failed to fetch global transactions:', error);
+    const result = await invokeFinanceAction('list_global_transactions');
+    if (result.error) {
+      console.error('Failed to fetch global transactions:', result.error);
       return;
     }
 
+    const data = result.data || [];
     if (data) setGlobalTransactions(data);
   };
 
@@ -450,22 +476,30 @@ function App() {
 
   const togglePaid = async (id, currentStatus) => {
     setTransactions(transactions.map(tx => tx.id === id ? { ...tx, isPaid: !currentStatus } : tx));
-    await supabase.from('expenses').update({ is_paid: !currentStatus }).eq('id', id).eq('user_id', user.id);
+    const result = await invokeFinanceAction('toggle_paid', {
+      transactionId: id,
+      isPaid: !currentStatus
+    });
+
+    if (result.error) {
+      setTransactions(transactions.map(tx => tx.id === id ? { ...tx, isPaid: currentStatus } : tx));
+      alert(result.error);
+      return;
+    }
+
+    await fetchGlobalTransactions();
   };
 
-  const executeInsertWithFallback = async (newRows) => {
+  const insertTransactions = async (newRows) => {
     if (!user?.id) return;
 
-    const rowsWithUserId = newRows.map((row) => ({ ...row, user_id: user.id }));
-
-    const res = await supabase.from('expenses').insert(rowsWithUserId);
-    if (res.error && res.error.message.includes('budget_month')) {
-       const fallbackRows = rowsWithUserId.map(r => {
-         const { budget_month, ...rest } = r;
-         return rest;
-       });
-       await supabase.from('expenses').insert(fallbackRows);
+    const result = await invokeFinanceAction('insert_transactions', { rows: newRows });
+    if (result.error) {
+      alert(result.error);
+      return;
     }
+
+    await Promise.all([fetchTransactions(), fetchGlobalTransactions()]);
   };
 
   const addExpense = async (e) => {
@@ -479,7 +513,7 @@ function App() {
     
     if (name && amount) {
       setIsAddOpen(false);
-      await executeInsertWithFallback([{ name, amount, account, category, is_paid: true, date, budget_month: budgetMonth }]);
+      await insertTransactions([{ name, amount, account, category, is_paid: true, date, budget_month: budgetMonth }]);
     }
   };
 
@@ -493,7 +527,7 @@ function App() {
     
     if (name && amount) {
       setIsTopUpOpen(false);
-      await executeInsertWithFallback([{ name, amount, account, category: 'Income', is_paid: true, date, budget_month: budgetMonth }]);
+      await insertTransactions([{ name, amount, account, category: 'Income', is_paid: true, date, budget_month: budgetMonth }]);
     }
   };
 
@@ -508,7 +542,7 @@ function App() {
     if (fromAcc === toAcc) return alert('Source and destination accounts must be different.');
     if (amount > 0) {
       setIsTransferOpen(false);
-      await executeInsertWithFallback([
+      await insertTransactions([
         { name: `Transfer to ${toAcc}`, amount, account: fromAcc, category: 'Transfer Out', is_paid: true, date, budget_month: budgetMonth },
         { name: `Transfer from ${fromAcc}`, amount, account: toAcc, category: 'Transfer In', is_paid: true, date, budget_month: budgetMonth }
       ]);
@@ -517,22 +551,29 @@ function App() {
 
   const removeTransaction = async (id) => {
     setTransactions(transactions.filter(tx => tx.id !== id));
-    await supabase.from('expenses').delete().eq('id', id).eq('user_id', user.id);
+    const result = await invokeFinanceAction('delete_transaction', { transactionId: id });
+    if (result.error) {
+      alert(result.error);
+      await fetchTransactions();
+      return;
+    }
+
+    await fetchGlobalTransactions();
   };
 
   const persistSettings = async (nextSettings) => {
     if (!user?.id) return;
 
-    const payload = {
-      user_id: user.id,
-      total_income: nextSettings.total_income,
-      accounts: nextSettings.accounts,
-      categories: nextSettings.categories,
-      goals: nextSettings.goals
-    };
+    const result = await invokeFinanceAction('save_settings', {
+      settings: {
+        total_income: nextSettings.total_income,
+        accounts: nextSettings.accounts,
+        categories: nextSettings.categories,
+        goals: nextSettings.goals
+      }
+    });
 
-    const { error } = await supabase.from('app_settings').upsert(payload, { onConflict: 'user_id' });
-    if (error) console.error('Failed to save settings:', error);
+    if (result.error) console.error('Failed to save settings:', result.error);
   };
 
   const saveSettings = async () => {
@@ -895,26 +936,75 @@ function App() {
   if (!user) {
     return (
       <div className="login-screen">
-        <div className="login-card">
-          <div className="login-logo">AlkaFlow</div>
-          <h1 style={{fontSize:'2rem', fontWeight:'800', marginBottom:'0.5rem', letterSpacing:'-0.03em'}}>Welcome back</h1>
-          <p style={{color:'var(--text-secondary)', marginBottom:'2rem', lineHeight:'1.7'}}>Track your money effortlessly - just by chatting. Secure. Private. Encrypted.</p>
-          <form onSubmit={handleLogin}>
-            {loginError && (<div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>{loginError}</div>)}
-            <div style={{marginBottom:'1.5rem', textAlign:'left'}}>
-              <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Username</label>
-              <input type="text" name="username" required className="form-input" placeholder="Enter username" />
+        <div className="login-shell">
+          <section className="login-brand-panel">
+            <div className="login-brand-mark">
+              <AlkaFlowLogoMark size={104} />
             </div>
-            <div style={{marginBottom:'2rem', textAlign:'left'}}>
-              <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Password</label>
-              <input type="password" name="password" required className="form-input" placeholder="••••••••" />
+            <div className="login-brand-copy">
+              <AlkaFlowWordmark />
+              <p className="login-brand-tagline">TRACK YOUR MONEY. EFFORTLESSLY.</p>
+              <p className="login-brand-description">
+                AlkaFlow helps you track income, expenses, and account movement in one clean flow. Built for speed, clarity, and everyday financial confidence.
+              </p>
             </div>
-            <label style={{display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem', color:'var(--text-secondary)', fontSize:'0.9rem', cursor:'pointer'}}>
-              <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-              Remember me
-            </label>
-            <button type="submit" className="btn-primary" style={{width:'100%', padding:'1rem'}}>Sign In to AlkaFlow</button>
-          </form>
+            <div className="login-brand-highlights">
+              <div className="login-highlight-card">
+                <div className="login-highlight-icon"><CheckCircle2 size={18} /></div>
+                <div>
+                  <strong>Auto categorize</strong>
+                  <span>Keep transaction tracking tidy and consistent.</span>
+                </div>
+              </div>
+              <div className="login-highlight-card">
+                <div className="login-highlight-icon"><ArrowRightLeft size={18} /></div>
+                <div>
+                  <strong>Track every flow</strong>
+                  <span>Income, expenses, and transfers stay visible.</span>
+                </div>
+              </div>
+              <div className="login-highlight-card">
+                <div className="login-highlight-icon"><Target size={18} /></div>
+                <div>
+                  <strong>Focused on goals</strong>
+                  <span>See progress clearly with a calm dashboard.</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="login-card">
+            <div className="login-card-header">
+              <div className="login-logo-row">
+                <AlkaFlowLogoMark size={46} className="login-logo-icon" />
+                <div>
+                  <AlkaFlowWordmark compact />
+                  <p className="login-logo-caption">Secure sign in for your budgeting workspace</p>
+                </div>
+              </div>
+              <div>
+                <h1 className="login-title">Welcome back</h1>
+                <p className="login-subtitle">Sign in to continue managing your money flow.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleLogin}>
+              {loginError && (<div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>{loginError}</div>)}
+              <div style={{marginBottom:'1.5rem', textAlign:'left'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Username</label>
+                <input type="text" name="username" required className="form-input login-input" placeholder="Enter username" />
+              </div>
+              <div style={{marginBottom:'2rem', textAlign:'left'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Password</label>
+                <input type="password" name="password" required className="form-input login-input" placeholder="••••••••" />
+              </div>
+              <label className="login-remember">
+                <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+                Remember me
+              </label>
+              <button type="submit" className="btn-primary login-submit" style={{width:'100%', padding:'1rem'}}>Sign In to AlkaFlow</button>
+            </form>
+          </section>
         </div>
       </div>
     );

@@ -1,11 +1,11 @@
 {
-  "name": "Alkhaf Money Management",
-  "short_name": "FinFlow",
+  "name": "AlkaFlow",
+  "short_name": "AlkaFlow",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#213f31",
   "theme_color": "#213f31",
-  "description": "Zero-Based Budgeting Finance App",
+  "description": "Track your money effortlessly with AlkaFlow",
   "icons": [
     {
       "src": "/icon-192.png",

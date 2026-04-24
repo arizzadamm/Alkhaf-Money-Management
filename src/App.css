@@ -15,28 +15,204 @@
   height: 100vh;
   width: 100vw;
   background:
-    radial-gradient(circle at top left, rgba(210, 244, 17, 0.28), transparent 28%),
+    radial-gradient(circle at top left, rgba(210, 244, 17, 0.22), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(33, 63, 49, 0.14), transparent 26%),
     linear-gradient(180deg, #f8fafc 0%, #eef4f1 100%);
   position: relative;
   overflow: hidden;
+  padding: 2rem;
 }
 .login-screen::before {
-  content: ""; position: absolute; top: -10%; right: -6%; width: 28rem; height: 28rem;
-  background: radial-gradient(circle, rgba(33, 63, 49, 0.1) 0%, transparent 70%);
-  opacity: 1; border-radius: 50%;
+  content: "";
+  position: absolute;
+  inset: auto auto -12rem -10rem;
+  width: 28rem;
+  height: 28rem;
+  background: radial-gradient(circle, rgba(33, 63, 49, 0.12) 0%, transparent 68%);
+  border-radius: 50%;
+}
+.login-screen::after {
+  content: "";
+  position: absolute;
+  top: -9rem;
+  right: -8rem;
+  width: 24rem;
+  height: 24rem;
+  background: radial-gradient(circle, rgba(210, 244, 17, 0.22) 0%, transparent 68%);
+  border-radius: 50%;
+}
+.login-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(380px, 430px);
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 32px;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+}
+.login-brand-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 4rem;
+  background:
+    radial-gradient(circle at 85% 20%, rgba(210, 244, 17, 0.12), transparent 20%),
+    radial-gradient(circle at 20% 80%, rgba(210, 244, 17, 0.1), transparent 22%),
+    linear-gradient(145deg, #0f3427 0%, #123727 48%, #173f2e 100%);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.login-brand-panel::after {
+  content: "";
+  position: absolute;
+  right: -4rem;
+  bottom: -5rem;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(210, 244, 17, 0.18) 0%, rgba(210, 244, 17, 0.04) 38%, transparent 65%);
+}
+.login-brand-mark,
+.login-brand-copy,
+.login-brand-highlights {
+  position: relative;
+  z-index: 1;
+}
+.login-brand-mark {
+  width: fit-content;
+  padding: 1rem;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.alkaflow-wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: clamp(3.6rem, 6vw, 5.8rem);
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+}
+.alkaflow-wordmark.compact {
+  font-size: 2rem;
+}
+.alkaflow-wordmark-primary {
+  color: #ffffff;
+}
+.alkaflow-wordmark-accent {
+  color: var(--accent);
+}
+.login-card .alkaflow-wordmark-primary {
+  color: var(--primary);
+}
+.login-brand-tagline {
+  margin-top: 0.85rem;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1rem;
+  letter-spacing: 0.22em;
+}
+.login-brand-description {
+  margin-top: 1.5rem;
+  max-width: 34rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1rem;
+  line-height: 1.8;
+}
+.login-brand-highlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.login-highlight-card {
+  min-height: 140px;
+  padding: 1.2rem;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.login-highlight-card strong {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 1rem;
+}
+.login-highlight-card span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.login-highlight-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(210, 244, 17, 0.15);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
 }
 .login-card {
-  background: var(--surface); padding: 3rem; border-radius: 24px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12); width: 100%; max-width: 440px;
-  text-align: center; z-index: 10; border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.94);
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-left: 1px solid rgba(226, 232, 240, 0.8);
 }
-.login-logo {
-  display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 2rem; margin-bottom: 1rem; letter-spacing: -0.04em;
-  color: transparent;
-  background: linear-gradient(90deg, var(--primary) 0 54%, var(--accent) 54% 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
+.login-card-header {
+  margin-bottom: 2rem;
+}
+.login-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 2rem;
+}
+.login-logo-icon {
+  flex: none;
+}
+.login-logo-caption {
+  margin-top: 0.15rem;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+.login-title {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin-bottom: 0.5rem;
+}
+.login-subtitle {
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.login-input {
+  min-height: 52px;
+}
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.login-remember input {
+  accent-color: var(--primary);
+}
+.login-submit {
+  font-weight: 700;
+  box-shadow: 0 16px 28px rgba(33, 63, 49, 0.18);
 }
 
 /* ========================================= */
@@ -233,6 +409,44 @@
   .hero-card-metric { width: 100%; }
   .telegram-settings-card,
   .telegram-connection-item { flex-direction: column; align-items: stretch; }
+  .login-screen {
+    padding: 1rem;
+    align-items: stretch;
+    height: auto;
+    min-height: 100vh;
+  }
+  .login-shell {
+    grid-template-columns: 1fr;
+    border-radius: 28px;
+  }
+  .login-brand-panel {
+    padding: 2rem 1.5rem;
+  }
+  .login-brand-highlights {
+    grid-template-columns: 1fr;
+  }
+  .login-highlight-card {
+    min-height: unset;
+  }
+  .alkaflow-wordmark {
+    font-size: clamp(2.8rem, 14vw, 4rem);
+  }
+  .alkaflow-wordmark.compact {
+    font-size: 1.9rem;
+  }
+  .login-brand-tagline {
+    font-size: 0.85rem;
+    letter-spacing: 0.16em;
+  }
+  .login-card {
+    margin: 0;
+    padding: 2rem 1.5rem;
+    border-left: none;
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+  }
+  .login-title {
+    font-size: 1.7rem;
+  }
   
   /* Mobile Header */
   .mobile-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; }
@@ -295,7 +509,6 @@
   .full-transactions-table { display: block; overflow-x: auto; white-space: nowrap; }
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal-content { border-radius: 24px 24px 0 0; padding: 1.5rem; padding-bottom: 2.5rem; animation: slideUp 0.3s ease-out; }
-  .login-card { margin: 1.5rem; padding: 2rem; }
   .telegram-qr-image { width: 160px; height: 160px; }
 }
 
