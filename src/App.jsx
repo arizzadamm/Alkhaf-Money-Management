@@ -557,12 +557,17 @@ function App() {
       <aside className="sidebar">
         <div>
           <div className="logo"><div className="logo-icon">AF</div> Alkhaf</div>
-            <div className="nav-links">
-              <div className={`nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}><Home size={20} /> Home</div>
-              <div className={`nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => { setActiveView('transactions'); setSearchQuery(''); }}><CreditCard size={20} /> Transactions</div>
-              {isAdmin && <div className={`nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}><Users size={20} /> Admin</div>}
-              <div className={`nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}><User size={20} /> Profile</div>
-            </div>
+          <div className="nav-links">
+            {isAdmin ? (
+              <div className={`nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}><Users size={20} /> User Management</div>
+            ) : (
+              <>
+                <div className={`nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}><Home size={20} /> Home</div>
+                <div className={`nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => { setActiveView('transactions'); setSearchQuery(''); }}><CreditCard size={20} /> Transactions</div>
+                <div className={`nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}><User size={20} /> Profile</div>
+              </>
+            )}
+          </div>
         </div>
         <div className="sidebar-bottom">
           <div className="profile-widget">
@@ -575,11 +580,16 @@ function App() {
             </div>
             <Bell size={18} color="var(--text-secondary)" style={{cursor:'pointer'}} />
           </div>
-          <div className="total-balance">
-            <div className="total-balance-label">Total Balance</div>
-            <div className="total-balance-value">{formatIDR(totalBalance)}</div>
-          </div>
-          <button className="btn-lime"><QrCode size={20} /> Scan QR</button>
+          {!isAdmin && (
+            <>
+              <div className="total-balance">
+                <div className="total-balance-label">Total Balance</div>
+                <div className="total-balance-value">{formatIDR(totalBalance)}</div>
+              </div>
+              <button className="btn-lime"><QrCode size={20} /> Scan QR</button>
+            </>
+          )}
+          {isAdmin && <button className="btn-danger" onClick={handleLogout}><LogOut size={18}/> Logout</button>}
         </div>
       </aside>
 
@@ -592,21 +602,25 @@ function App() {
             {activeView === 'profile' && `Your Profile`}
           </div>
           <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
-            <div className="search-bar">
-              <Search size={18} color="var(--text-secondary)"/>
-              <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => {setSearchQuery(e.target.value); if(activeView!=='transactions') setActiveView('transactions');}}/>
-            </div>
             <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={toggleTheme}>
               {isDarkMode ? <Sun size={20}/> : <Moon size={20}/>}
             </button>
-            <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={() => setIsSettingsOpen(true)}>
-              <Settings size={20} />
-            </button>
+            {!isAdmin && (
+              <>
+                <div className="search-bar">
+                  <Search size={18} color="var(--text-secondary)"/>
+                  <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => {setSearchQuery(e.target.value); if(activeView!=='transactions') setActiveView('transactions');}}/>
+                </div>
+                <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={() => setIsSettingsOpen(true)}>
+                  <Settings size={20} />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {isLoading ? (
-           <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'50vh', color:'var(--text-secondary)'}}>Loading {viewMonthName} data...</div>
+           <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'50vh', color:'var(--text-secondary)'}}>{isAdmin ? 'Loading admin data...' : `Loading ${viewMonthName} data...`}</div>
         ) : activeView === 'home' ? (
           <>
             <div style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'2rem', color:'white', marginBottom:'1.5rem', display:'flex', gap:'2rem', alignItems:'center', flexWrap:'wrap'}}>
@@ -949,10 +963,12 @@ function App() {
              <button style={{background:'var(--bg-card)', border:'none', width:'48px', height:'48px', borderRadius:'50%', display:'grid', placeContent:'center'}} onClick={toggleTheme}>
                {isDarkMode ? <Sun size={20} color="var(--text-primary)"/> : <Moon size={20} color="var(--text-primary)"/>}
              </button>
-             <button className="mobile-bell">
-               <Bell size={20} color="var(--text-primary)"/>
-               <span className="notification-dot"></span>
-             </button>
+             {!isAdmin && (
+               <button className="mobile-bell">
+                 <Bell size={20} color="var(--text-primary)"/>
+                 <span className="notification-dot"></span>
+               </button>
+             )}
           </div>
         </div>
 
@@ -1121,23 +1137,39 @@ function App() {
       </main>
 
       <div className="mobile-bottom-nav">
-        <div className={`mobile-nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}>
-          <Home size={24} /> <span>Home</span>
-        </div>
-        <div className={`mobile-nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => setActiveView('transactions')}>
-          <ArrowRightLeft size={24} /> <span>Trans</span>
-        </div>
-        
-        <div className="mobile-nav-fab" onClick={() => setIsTopUpOpen(true)}>
-           <QrCode size={26} color="#0f172a" />
-        </div>
+        {isAdmin ? (
+          <>
+            <div className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}>
+              <Users size={24} /> <span>Users</span>
+            </div>
+            <div className="mobile-nav-fab" onClick={handleLogout}>
+               <LogOut size={24} color="#0f172a" />
+            </div>
+            <div className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}>
+              <Settings size={24} /> <span>Admin</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={`mobile-nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}>
+              <Home size={24} /> <span>Home</span>
+            </div>
+            <div className={`mobile-nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => setActiveView('transactions')}>
+              <ArrowRightLeft size={24} /> <span>Trans</span>
+            </div>
+            
+            <div className="mobile-nav-fab" onClick={() => setIsTopUpOpen(true)}>
+               <QrCode size={26} color="#0f172a" />
+            </div>
 
-        <div className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => isAdmin ? (setActiveView('admin'), fetchAdminUsers()) : setIsSettingsOpen(true)}>
-          {isAdmin ? <Users size={24} /> : <CreditCard size={24} />} <span>{isAdmin ? 'Admin' : 'Cards'}</span>
-        </div>
-        <div className={`mobile-nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}>
-          <User size={24} /> <span>Profile</span>
-        </div>
+            <div className={`mobile-nav-item`} onClick={() => setIsSettingsOpen(true)}>
+              <CreditCard size={24} /> <span>Cards</span>
+            </div>
+            <div className={`mobile-nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}>
+              <User size={24} /> <span>Profile</span>
+            </div>
+          </>
+        )}
       </div>
     </>
   );
@@ -1236,7 +1268,7 @@ function App() {
       {isMobile ? renderMobileView() : renderDesktopView()}
 
       {/* MODALS (Shared across both views) */}
-      {isAddOpen && (
+      {!isAdmin && isAddOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
@@ -1276,7 +1308,7 @@ function App() {
         </div>
       )}
 
-      {isTopUpOpen && (
+      {!isAdmin && isTopUpOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
@@ -1310,7 +1342,7 @@ function App() {
         </div>
       )}
 
-      {isTransferOpen && (
+      {!isAdmin && isTransferOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
@@ -1346,7 +1378,7 @@ function App() {
         </div>
       )}
 
-      {isSettingsOpen && renderSettingsModal()}
+      {!isAdmin && isSettingsOpen && renderSettingsModal()}
     </div>
   );
 }
