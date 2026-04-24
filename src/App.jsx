@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, RefreshCw, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun, Target, Eye, ChevronRight } from 'lucide-react';
+import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun, Target, Eye, ChevronRight, Users } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from './supabaseClient';
 import './App.css';
@@ -28,6 +28,8 @@ function App() {
   const [activeView, setActiveView] = useState('home');
   const [isLoading, setIsLoading] = useState(true);
   const [loginError, setLoginError] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [adminSuccess, setAdminSuccess] = useState('');
   
   const [baseTotalIncome, setBaseTotalIncome] = useState(0);
   const [accounts, setAccounts] = useState([]);
@@ -35,6 +37,8 @@ function App() {
   const [goals, setGoals] = useState([]); 
   const [transactions, setTransactions] = useState([]); 
   const [globalTransactions, setGlobalTransactions] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [editingAdminUserId, setEditingAdminUserId] = useState(null);
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
@@ -45,6 +49,7 @@ function App() {
   const [monthOffset, setMonthOffset] = useState(0); 
   const [searchQuery, setSearchQuery] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const isAdmin = user?.role === 'admin';
   
   const getReferenceDate = useMemo(() => {
     const d = new Date();
@@ -79,7 +84,11 @@ function App() {
 
   useEffect(() => {
     const savedSession = localStorage.getItem('alkhaf_user_session');
-    if (savedSession) setUser(JSON.parse(savedSession));
+    if (savedSession) {
+      const parsedUser = JSON.parse(savedSession);
+      setUser(parsedUser);
+      setActiveView(parsedUser.role === 'admin' ? 'admin' : 'home');
+    }
 
     const savedTheme = localStorage.getItem('alkhaf_theme');
     if (savedTheme === 'dark') {
@@ -103,21 +112,26 @@ function App() {
   useEffect(() => {
     if (user) {
       setIsLoading(true);
+      if (user.role === 'admin') {
+        fetchAdminUsers().finally(() => setIsLoading(false));
+        return;
+      }
+
       fetchSettings();
       fetchTransactions(); 
       fetchGlobalTransactions();
 
       const txSub = supabase
-        .channel('public:expenses')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, (payload) => {
+        .channel(`public:expenses:user-${user.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${user.id}` }, () => {
           fetchTransactions();
           fetchGlobalTransactions();
         })
         .subscribe();
 
       const settingsSub = supabase
-        .channel('public:app_settings')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload) => {
+        .channel(`public:app_settings:user-${user.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings', filter: `user_id=eq.${user.id}` }, () => {
           fetchSettings();
         })
         .subscribe();
@@ -130,19 +144,39 @@ function App() {
   }, [user, monthOffset]);
 
   const fetchSettings = async () => {
-    const { data, error } = await supabase.from('app_settings').select('*').eq('id', 1).single();
+    if (!user?.id) return;
+
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Failed to fetch settings:', error);
+      return;
+    }
+
     if (data) {
-      setBaseTotalIncome(data.total_income);
+      setBaseTotalIncome(Number(data.total_income) || 0);
       setAccounts(data.accounts || []);
       setCategories(data.categories || []);
-      setGoals(data.goals || []); 
+      setGoals(data.goals || []);
+    } else {
+      setBaseTotalIncome(0);
+      setAccounts([]);
+      setCategories([]);
+      setGoals([]);
     }
   };
 
   const fetchTransactions = async () => {
+    if (!user?.id) return;
+
     let { data, error } = await supabase
       .from('expenses')
       .select('*')
+      .eq('user_id', user.id)
       .eq('budget_month', activeBudgetMonth)
       .order('created_at', { ascending: false });
 
@@ -152,6 +186,7 @@ function App() {
       const fallback = await supabase
         .from('expenses')
         .select('*')
+        .eq('user_id', user.id)
         .gte('created_at', startOfMonth)
         .lte('created_at', endOfMonth)
         .order('created_at', { ascending: false });
@@ -168,7 +203,18 @@ function App() {
   };
 
   const fetchGlobalTransactions = async () => {
-    const { data } = await supabase.from('expenses').select('amount, category, account, is_paid');
+    if (!user?.id) return;
+
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('amount, category, account, is_paid')
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Failed to fetch global transactions:', error);
+      return;
+    }
+
     if (data) setGlobalTransactions(data);
   };
 
@@ -184,6 +230,7 @@ function App() {
 
       const userData = { id: data.id, name: data.username, role: data.role };
       setUser(userData);
+      setActiveView(data.role === 'admin' ? 'admin' : 'home');
       localStorage.setItem('alkhaf_user_session', JSON.stringify(userData));
     } catch (err) {
       setLoginError('Terjadi kesalahan koneksi database.');
@@ -191,18 +238,50 @@ function App() {
   };
 
   const handleLogout = () => {
-    setUser(null); setActiveView('home'); localStorage.removeItem('alkhaf_user_session'); 
+    setUser(null);
+    setActiveView('home');
+    setAdminError('');
+    setAdminSuccess('');
+    setBaseTotalIncome(0);
+    setAccounts([]);
+    setCategories([]);
+    setGoals([]);
+    setTransactions([]);
+    setGlobalTransactions([]);
+    setAdminUsers([]);
+    setEditingAdminUserId(null);
+    localStorage.removeItem('alkhaf_user_session');
+  };
+
+  const fetchAdminUsers = async () => {
+    if (!isAdmin) return;
+
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('id, username, role')
+      .order('id', { ascending: true });
+
+    if (error) {
+      setAdminError('Gagal mengambil daftar user.');
+      return;
+    }
+
+    setAdminUsers(data || []);
   };
 
   const togglePaid = async (id, currentStatus) => {
     setTransactions(transactions.map(tx => tx.id === id ? { ...tx, isPaid: !currentStatus } : tx));
-    await supabase.from('expenses').update({ is_paid: !currentStatus }).eq('id', id);
+    await supabase.from('expenses').update({ is_paid: !currentStatus }).eq('id', id).eq('user_id', user.id);
   };
 
   const executeInsertWithFallback = async (newRows) => {
-    const res = await supabase.from('expenses').insert(newRows);
+    if (!user?.id) return;
+
+    const rowsWithUserId = newRows.map((row) => ({ ...row, user_id: user.id }));
+
+    const res = await supabase.from('expenses').insert(rowsWithUserId);
     if (res.error && res.error.message.includes('budget_month')) {
-       const fallbackRows = newRows.map(r => {
+       const fallbackRows = rowsWithUserId.map(r => {
          const { budget_month, ...rest } = r;
          return rest;
        });
@@ -259,12 +338,32 @@ function App() {
 
   const removeTransaction = async (id) => {
     setTransactions(transactions.filter(tx => tx.id !== id));
-    await supabase.from('expenses').delete().eq('id', id);
+    await supabase.from('expenses').delete().eq('id', id).eq('user_id', user.id);
+  };
+
+  const persistSettings = async (nextSettings) => {
+    if (!user?.id) return;
+
+    const payload = {
+      user_id: user.id,
+      total_income: nextSettings.total_income,
+      accounts: nextSettings.accounts,
+      categories: nextSettings.categories,
+      goals: nextSettings.goals
+    };
+
+    const { error } = await supabase.from('app_settings').upsert(payload, { onConflict: 'user_id' });
+    if (error) console.error('Failed to save settings:', error);
   };
 
   const saveSettings = async () => {
     setIsSettingsOpen(false);
-    await supabase.from('app_settings').upsert({ id: 1, total_income: baseTotalIncome, accounts: accounts, categories: categories, goals: goals });
+    await persistSettings({
+      total_income: baseTotalIncome,
+      accounts,
+      categories,
+      goals
+    });
   };
 
   const quickAddGoalFund = (goalId, amountToAdd) => {
@@ -275,8 +374,93 @@ function App() {
         return g;
       });
       setGoals(updatedGoals);
-      supabase.from('app_settings').upsert({ id: 1, total_income: baseTotalIncome, accounts: accounts, categories: categories, goals: updatedGoals }).then();
+      persistSettings({
+        total_income: baseTotalIncome,
+        accounts,
+        categories,
+        goals: updatedGoals
+      });
     }
+  };
+
+  const resetAdminFeedback = () => {
+    setAdminError('');
+    setAdminSuccess('');
+  };
+
+  const handleAdminUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!isAdmin) return;
+
+    resetAdminFeedback();
+
+    const formData = new FormData(e.currentTarget);
+    const id = formData.get('id');
+    const username = String(formData.get('username') || '').trim();
+    const password = String(formData.get('password') || '').trim();
+    const role = String(formData.get('role') || 'user');
+
+    if (!username) {
+      setAdminError('Username wajib diisi.');
+      return;
+    }
+
+    if (!id && !password) {
+      setAdminError('Password wajib diisi untuk user baru.');
+      return;
+    }
+
+    const payload = { username, role };
+    if (password) payload.password = password;
+
+    let result;
+    if (id) {
+      result = await supabase.from('app_users').update(payload).eq('id', id);
+    } else {
+      result = await supabase.from('app_users').insert(payload);
+    }
+
+    if (result.error) {
+      setAdminError(result.error.message || 'Gagal menyimpan user.');
+      return;
+    }
+
+    setAdminSuccess(id ? 'User berhasil diperbarui.' : 'User baru berhasil dibuat.');
+    setEditingAdminUserId(null);
+    e.currentTarget.reset();
+    await fetchAdminUsers();
+  };
+
+  const startEditAdminUser = (adminUser) => {
+    setEditingAdminUserId(adminUser.id);
+    resetAdminFeedback();
+  };
+
+  const cancelEditAdminUser = (form) => {
+    setEditingAdminUserId(null);
+    resetAdminFeedback();
+    form?.reset();
+  };
+
+  const deleteAdminUser = async (id) => {
+    if (!isAdmin) return;
+    if (id === user.id) {
+      setAdminError('Admin yang sedang login tidak bisa menghapus akun sendiri.');
+      return;
+    }
+
+    resetAdminFeedback();
+    const confirmed = window.confirm('Hapus user ini dari sistem?');
+    if (!confirmed) return;
+
+    const { error } = await supabase.from('app_users').delete().eq('id', id);
+    if (error) {
+      setAdminError(error.message || 'Gagal menghapus user.');
+      return;
+    }
+
+    setAdminSuccess('User berhasil dihapus.');
+    await fetchAdminUsers();
   };
 
   const exportToCSV = () => {
@@ -373,11 +557,12 @@ function App() {
       <aside className="sidebar">
         <div>
           <div className="logo"><div className="logo-icon">AF</div> Alkhaf</div>
-          <div className="nav-links">
-            <div className={`nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}><Home size={20} /> Home</div>
-            <div className={`nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => { setActiveView('transactions'); setSearchQuery(''); }}><CreditCard size={20} /> Transactions</div>
-            <div className={`nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}><User size={20} /> Profile</div>
-          </div>
+            <div className="nav-links">
+              <div className={`nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}><Home size={20} /> Home</div>
+              <div className={`nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => { setActiveView('transactions'); setSearchQuery(''); }}><CreditCard size={20} /> Transactions</div>
+              {isAdmin && <div className={`nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}><Users size={20} /> Admin</div>}
+              <div className={`nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}><User size={20} /> Profile</div>
+            </div>
         </div>
         <div className="sidebar-bottom">
           <div className="profile-widget">
@@ -403,6 +588,7 @@ function App() {
           <div className="page-title">
             {activeView === 'home' && `Overview - ${viewMonthName}`}
             {activeView === 'transactions' && `Transactions for ${viewMonthName}`}
+            {activeView === 'admin' && 'Admin Back Office'}
             {activeView === 'profile' && `Your Profile`}
           </div>
           <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
@@ -640,9 +826,105 @@ function App() {
               </tbody>
             </table>
           </div>
+        ) : activeView === 'admin' ? (
+          <div style={{display:'grid', gridTemplateColumns:'1.1fr 1.4fr', gap:'1.5rem'}}>
+            <div className="widget-card" style={{alignSelf:'start'}}>
+              <div className="widget-header" style={{marginBottom:'1rem'}}>
+                <span className="widget-title">{editingAdminUserId ? 'Edit User' : 'Create User'}</span>
+              </div>
+              {adminError && <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminError}</div>}
+              {adminSuccess && <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminSuccess}</div>}
+              <form onSubmit={handleAdminUserSubmit} key={editingAdminUserId || 'new-user-form'}>
+                <input type="hidden" name="id" defaultValue={editingAdminUserId || ''} />
+                <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+                  <div>
+                    <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Username</label>
+                    <input
+                      type="text"
+                      name="username"
+                      className="form-input"
+                      defaultValue={editingAdminUserId ? adminUsers.find((item) => item.id === editingAdminUserId)?.username || '' : ''}
+                      placeholder="Masukkan username"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>
+                      Password {editingAdminUserId ? '(kosongkan jika tidak diubah)' : ''}
+                    </label>
+                    <input type="password" name="password" className="form-input" placeholder={editingAdminUserId ? 'Biarkan kosong jika tetap sama' : 'Masukkan password'} />
+                  </div>
+                  <div>
+                    <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Role</label>
+                    <select
+                      name="role"
+                      className="form-input"
+                      defaultValue={editingAdminUserId ? adminUsers.find((item) => item.id === editingAdminUserId)?.role || 'user' : 'user'}
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="btn-primary" style={{width:'100%', color:'#fff'}}>
+                    {editingAdminUserId ? 'Update User' : 'Create User'}
+                  </button>
+                  {editingAdminUserId && (
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      onClick={(event) => cancelEditAdminUser(event.currentTarget.form)}
+                      style={{justifyContent:'center'}}
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div className="widget-card">
+              <div className="widget-header" style={{borderBottom:'1px solid var(--border-color)', paddingBottom:'1rem', marginBottom:'1rem'}}>
+                <span className="widget-title">User Management ({adminUsers.length})</span>
+                <button className="see-all" onClick={fetchAdminUsers} style={{background:'none', border:'none'}}>Refresh</button>
+              </div>
+              <table className="full-transactions-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th style={{textAlign:'right'}}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminUsers.map((adminUser) => (
+                    <tr key={adminUser.id}>
+                      <td style={{color:'var(--text-secondary)'}}>{adminUser.id}</td>
+                      <td>{adminUser.username}</td>
+                      <td style={{textTransform:'capitalize'}}>{adminUser.role || 'user'}</td>
+                      <td style={{textAlign:'right'}}>
+                        <div style={{display:'inline-flex', gap:'0.5rem'}}>
+                          <button className="btn-primary" type="button" onClick={() => startEditAdminUser(adminUser)} style={{padding:'0.6rem 0.9rem', color:'#fff'}}>Edit</button>
+                          <button className="btn-danger" type="button" onClick={() => deleteAdminUser(adminUser.id)}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {adminUsers.length === 0 && (
+                    <tr>
+                      <td colSpan="4" style={{textAlign:'center', color:'var(--text-secondary)', padding:'1.5rem'}}>Belum ada user.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : activeView === 'profile' ? (
            <div className="widget-card" style={{maxWidth:'600px', margin:'0 auto', textAlign:'center', padding:'3rem'}}>
              <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
+             <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
              <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
            </div>
         ) : null}
@@ -791,9 +1073,48 @@ function App() {
                 </tbody>
              </table>
           </div>
+        ) : activeView === 'admin' ? (
+           <div style={{display:'flex', flexDirection:'column', gap:'1rem', paddingBottom:'2rem'}}>
+             <div className="widget-card">
+               <h2 style={{fontSize:'1.4rem', fontWeight:'700', marginBottom:'0.5rem'}}>Admin Back Office</h2>
+               <p style={{color:'var(--text-secondary)', marginBottom:'1rem'}}>Kelola user aplikasi dari satu tempat.</p>
+               {adminError && <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminError}</div>}
+               {adminSuccess && <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminSuccess}</div>}
+               <form onSubmit={handleAdminUserSubmit} key={editingAdminUserId || 'mobile-new-user-form'} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+                 <input type="hidden" name="id" defaultValue={editingAdminUserId || ''} />
+                 <input type="text" name="username" className="form-input" placeholder="Username" defaultValue={editingAdminUserId ? adminUsers.find((item) => item.id === editingAdminUserId)?.username || '' : ''} required />
+                 <input type="password" name="password" className="form-input" placeholder={editingAdminUserId ? 'Password baru (opsional)' : 'Password'} />
+                 <select name="role" className="form-input" defaultValue={editingAdminUserId ? adminUsers.find((item) => item.id === editingAdminUserId)?.role || 'user' : 'user'}>
+                   <option value="user">User</option>
+                   <option value="admin">Admin</option>
+                 </select>
+                 <button type="submit" className="btn-primary" style={{color:'#fff'}}>{editingAdminUserId ? 'Update User' : 'Create User'}</button>
+               </form>
+             </div>
+             <div className="widget-card">
+               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
+                 <h3 style={{fontSize:'1rem', fontWeight:'600'}}>User List</h3>
+                 <button type="button" className="see-all" onClick={fetchAdminUsers} style={{background:'none', border:'none'}}>Refresh</button>
+               </div>
+               <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
+                 {adminUsers.map((adminUser) => (
+                   <div key={adminUser.id} style={{background:'var(--hover-bg)', padding:'1rem', borderRadius:'12px'}}>
+                     <div style={{fontWeight:'600'}}>{adminUser.username}</div>
+                     <div style={{color:'var(--text-secondary)', fontSize:'0.85rem', marginTop:'0.25rem'}}>ID {adminUser.id} • {(adminUser.role || 'user').toUpperCase()}</div>
+                     <div style={{display:'flex', gap:'0.5rem', marginTop:'0.75rem'}}>
+                       <button type="button" className="btn-primary" onClick={() => startEditAdminUser(adminUser)} style={{color:'#fff', padding:'0.6rem 0.9rem'}}>Edit</button>
+                       <button type="button" className="btn-danger" onClick={() => deleteAdminUser(adminUser.id)}><Trash2 size={16}/></button>
+                     </div>
+                   </div>
+                 ))}
+                 {adminUsers.length === 0 && <div style={{color:'var(--text-secondary)'}}>Belum ada user.</div>}
+               </div>
+             </div>
+           </div>
         ) : activeView === 'profile' ? (
            <div style={{textAlign:'center', marginTop:'3rem'}}>
              <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
+             <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
              <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
            </div>
         ) : null}
@@ -811,8 +1132,8 @@ function App() {
            <QrCode size={26} color="#0f172a" />
         </div>
 
-        <div className={`mobile-nav-item`} onClick={() => setIsSettingsOpen(true)}>
-          <CreditCard size={24} /> <span>Cards</span>
+        <div className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => isAdmin ? (setActiveView('admin'), fetchAdminUsers()) : setIsSettingsOpen(true)}>
+          {isAdmin ? <Users size={24} /> : <CreditCard size={24} />} <span>{isAdmin ? 'Admin' : 'Cards'}</span>
         </div>
         <div className={`mobile-nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}>
           <User size={24} /> <span>Profile</span>
