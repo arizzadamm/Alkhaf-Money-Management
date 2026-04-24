@@ -15,6 +15,7 @@ const formatIDR = (amount) => {
 const getInitial = (name) => name ? name.charAt(0).toUpperCase() : '?';
 const SESSION_STORAGE_KEY = 'alkhaf_user_session';
 const REMEMBER_ME_KEY = 'alkhaf_remember_me';
+const SESSION_PROOF_KEY = 'alkhaf_session_proof';
 
 const hashPassword = async (password) => {
   const bytes = new TextEncoder().encode(password);
@@ -35,6 +36,18 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const getStoredSessionProof = () => localStorage.getItem(SESSION_PROOF_KEY) || sessionStorage.getItem(SESSION_PROOF_KEY);
+
+  const storeSessionProof = (proof, shouldRemember) => {
+    if (shouldRemember) {
+      localStorage.setItem(SESSION_PROOF_KEY, proof);
+      sessionStorage.removeItem(SESSION_PROOF_KEY);
+    } else {
+      sessionStorage.setItem(SESSION_PROOF_KEY, proof);
+      localStorage.removeItem(SESSION_PROOF_KEY);
+    }
+  };
 
   const [user, setUser] = useState(null); 
   const [activeView, setActiveView] = useState('home');
@@ -279,6 +292,8 @@ function App() {
         sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
         localStorage.removeItem(SESSION_STORAGE_KEY);
       }
+
+      storeSessionProof(passwordHash, rememberMe);
     } catch (err) {
       setLoginError('Terjadi kesalahan koneksi database.');
     }
@@ -299,22 +314,33 @@ function App() {
     setEditingAdminUserId(null);
     localStorage.removeItem(SESSION_STORAGE_KEY);
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    localStorage.removeItem(SESSION_PROOF_KEY);
+    sessionStorage.removeItem(SESSION_PROOF_KEY);
   };
 
   const fetchAdminUsers = async () => {
     if (!isAdmin) return;
 
-    const { data, error } = await supabase
-      .from('app_users')
-      .select('id, username, role')
-      .order('id', { ascending: true });
-
-    if (error) {
-      setAdminError('Gagal mengambil daftar user.');
+    const sessionProof = getStoredSessionProof();
+    if (!sessionProof) {
+      setAdminError('Sesi admin tidak ditemukan. Silakan login ulang.');
       return;
     }
 
-    setAdminUsers(data || []);
+    const { data, error } = await supabase.functions.invoke('admin-user-management', {
+      body: {
+        action: 'list',
+        requesterId: user.id,
+        sessionProof
+      }
+    });
+
+    if (error || data?.error) {
+      setAdminError(data?.error || error?.message || 'Gagal mengambil daftar user.');
+      return;
+    }
+
+    setAdminUsers(data?.data || []);
   };
 
   const togglePaid = async (id, currentStatus) => {
@@ -458,18 +484,28 @@ function App() {
       return;
     }
 
-    const payload = { username, role };
-    if (password) payload.password = await hashPassword(password);
-
-    let result;
-    if (id) {
-      result = await supabase.from('app_users').update(payload).eq('id', id);
-    } else {
-      result = await supabase.from('app_users').insert(payload);
+    const sessionProof = getStoredSessionProof();
+    if (!sessionProof) {
+      setAdminError('Sesi admin tidak ditemukan. Silakan login ulang.');
+      return;
     }
 
-    if (result.error) {
-      setAdminError(result.error.message || 'Gagal menyimpan user.');
+    const passwordHash = password ? await hashPassword(password) : null;
+
+    const { data, error } = await supabase.functions.invoke('admin-user-management', {
+      body: {
+        action: id ? 'update' : 'create',
+        requesterId: user.id,
+        sessionProof,
+        targetUserId: id || null,
+        username,
+        role,
+        passwordHash
+      }
+    });
+
+    if (error || data?.error) {
+      setAdminError(data?.error || error?.message || 'Gagal menyimpan user.');
       return;
     }
 
@@ -499,9 +535,23 @@ function App() {
     const confirmed = window.confirm('Hapus user ini dari sistem?');
     if (!confirmed) return;
 
-    const { error } = await supabase.from('app_users').delete().eq('id', id);
-    if (error) {
-      setAdminError(error.message || 'Gagal menghapus user.');
+    const sessionProof = getStoredSessionProof();
+    if (!sessionProof) {
+      setAdminError('Sesi admin tidak ditemukan. Silakan login ulang.');
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke('admin-user-management', {
+      body: {
+        action: 'delete',
+        requesterId: user.id,
+        sessionProof,
+        targetUserId: id
+      }
+    });
+
+    if (error || data?.error) {
+      setAdminError(data?.error || error?.message || 'Gagal menghapus user.');
       return;
     }
 
