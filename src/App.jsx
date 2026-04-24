@@ -65,6 +65,11 @@ function App() {
   const [globalTransactions, setGlobalTransactions] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]);
   const [editingAdminUserId, setEditingAdminUserId] = useState(null);
+  const [telegramConnections, setTelegramConnections] = useState([]);
+  const [telegramLinkToken, setTelegramLinkToken] = useState(null);
+  const [telegramError, setTelegramError] = useState('');
+  const [telegramSuccess, setTelegramSuccess] = useState('');
+  const [isTelegramLoading, setIsTelegramLoading] = useState(false);
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
@@ -343,6 +348,103 @@ function App() {
     setAdminUsers(data?.data || []);
   };
 
+  const resetTelegramFeedback = () => {
+    setTelegramError('');
+    setTelegramSuccess('');
+  };
+
+  const invokeTelegramLinkAction = async (action, payload = {}) => {
+    if (!user?.id) return { error: 'User tidak ditemukan.' };
+
+    const sessionProof = getStoredSessionProof();
+    if (!sessionProof) return { error: 'Sesi tidak ditemukan. Silakan login ulang.' };
+
+    const { data, error } = await supabase.functions.invoke('telegram-link', {
+      body: {
+        action,
+        requesterId: user.id,
+        sessionProof,
+        ...payload
+      }
+    });
+
+    if (error || data?.error) {
+      return { error: data?.error || error?.message || 'Gagal terhubung ke layanan Telegram.' };
+    }
+
+    return { data: data?.data };
+  };
+
+  const fetchTelegramConnections = async () => {
+    if (!user?.id || isAdmin) return;
+
+    setIsTelegramLoading(true);
+    resetTelegramFeedback();
+
+    const result = await invokeTelegramLinkAction('list_connections');
+    if (result.error) {
+      setTelegramError(result.error);
+      setIsTelegramLoading(false);
+      return;
+    }
+
+    setTelegramConnections(result.data || []);
+    setIsTelegramLoading(false);
+  };
+
+  const generateTelegramLinkToken = async () => {
+    if (!user?.id || isAdmin) return;
+
+    setIsTelegramLoading(true);
+    resetTelegramFeedback();
+
+    const result = await invokeTelegramLinkAction('generate_token');
+    if (result.error) {
+      setTelegramError(result.error);
+      setIsTelegramLoading(false);
+      return;
+    }
+
+    setTelegramLinkToken(result.data);
+    setTelegramSuccess('Token linking baru berhasil dibuat. Kirim ke bot Telegram dalam 15 menit.');
+    setIsTelegramLoading(false);
+  };
+
+  const setPrimaryTelegramConnection = async (connectionId) => {
+    setIsTelegramLoading(true);
+    resetTelegramFeedback();
+
+    const result = await invokeTelegramLinkAction('set_primary', { connectionId });
+    if (result.error) {
+      setTelegramError(result.error);
+      setIsTelegramLoading(false);
+      return;
+    }
+
+    setTelegramSuccess('Koneksi utama Telegram berhasil diperbarui.');
+    await fetchTelegramConnections();
+    setIsTelegramLoading(false);
+  };
+
+  const unlinkTelegramConnection = async (connectionId) => {
+    const confirmed = window.confirm('Lepas koneksi Telegram ini dari akun Anda?');
+    if (!confirmed) return;
+
+    setIsTelegramLoading(true);
+    resetTelegramFeedback();
+
+    const result = await invokeTelegramLinkAction('unlink_connection', { connectionId });
+    if (result.error) {
+      setTelegramError(result.error);
+      setIsTelegramLoading(false);
+      return;
+    }
+
+    setTelegramSuccess('Koneksi Telegram berhasil dilepas.');
+    await fetchTelegramConnections();
+    setIsTelegramLoading(false);
+  };
+
   const togglePaid = async (id, currentStatus) => {
     setTransactions(transactions.map(tx => tx.id === id ? { ...tx, isPaid: !currentStatus } : tx));
     await supabase.from('expenses').update({ is_paid: !currentStatus }).eq('id', id).eq('user_id', user.id);
@@ -581,6 +683,11 @@ function App() {
     const lowerQ = searchQuery.toLowerCase();
     return transactions.filter(t => t.name.toLowerCase().includes(lowerQ) || t.category.toLowerCase().includes(lowerQ) || t.account.toLowerCase().includes(lowerQ));
   }, [transactions, searchQuery]);
+
+  useEffect(() => {
+    if (!user || isAdmin || !isSettingsOpen || settingsTab !== 'telegram') return;
+    fetchTelegramConnections();
+  }, [user, isAdmin, isSettingsOpen, settingsTab]);
 
   const totals = useMemo(() => {
     const incomes = transactions.filter(t => t.category === 'Income');
@@ -1285,6 +1392,7 @@ function App() {
           <div className={`tab ${settingsTab === 'accounts' ? 'active' : ''}`} onClick={() => setSettingsTab('accounts')}>Accounts</div>
           <div className={`tab ${settingsTab === 'categories' ? 'active' : ''}`} onClick={() => setSettingsTab('categories')}>Budgets</div>
           <div className={`tab ${settingsTab === 'goals' ? 'active' : ''}`} onClick={() => setSettingsTab('goals')}>Goals</div>
+          <div className={`tab ${settingsTab === 'telegram' ? 'active' : ''}`} onClick={() => setSettingsTab('telegram')}>Telegram</div>
         </div>
         
         {settingsTab === 'accounts' && (
@@ -1358,7 +1466,99 @@ function App() {
             ))}
           </div>
         )}
-        <button className="btn-primary" style={{width: '100%', marginTop:'2rem', padding:'1rem', color:'white'}} onClick={saveSettings}>Save to Supabase</button>
+
+        {settingsTab === 'telegram' && (
+          <div>
+            <div className="telegram-settings-card">
+              <div>
+                <div className="telegram-settings-title">Hubungkan Telegram</div>
+                <div className="telegram-settings-copy">
+                  Buat token dari sini, lalu kirim ke bot Telegram dengan format <strong>/start TOKEN</strong>.
+                  Satu akun bisa punya banyak koneksi, dan salah satunya bisa dijadikan primary.
+                </div>
+              </div>
+              <button type="button" className="btn-primary" onClick={generateTelegramLinkToken} disabled={isTelegramLoading} style={{color:'white'}}>
+                {isTelegramLoading ? 'Memproses...' : 'Generate Token'}
+              </button>
+            </div>
+
+            {telegramError && (
+              <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
+                {telegramError}
+              </div>
+            )}
+
+            {telegramSuccess && (
+              <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
+                {telegramSuccess}
+              </div>
+            )}
+
+            {telegramLinkToken && (
+              <div className="telegram-token-box">
+                <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginBottom:'0.4rem'}}>Token aktif</div>
+                <div className="telegram-token-value">{telegramLinkToken.token}</div>
+                <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.5rem'}}>
+                  Berlaku sampai {new Date(telegramLinkToken.expires_at).toLocaleString('id-ID')}
+                </div>
+              </div>
+            )}
+
+            <div className="telegram-settings-card" style={{marginTop:'1rem'}}>
+              <div>
+                <div className="telegram-settings-title">Koneksi Saat Ini</div>
+                <div className="telegram-settings-copy">
+                  Workflow `n8n` akan memakai `telegram_chat_id` yang sudah terhubung di sini untuk menentukan transaksi masuk ke user yang benar.
+                </div>
+              </div>
+              <button type="button" className="btn-primary" onClick={fetchTelegramConnections} disabled={isTelegramLoading} style={{color:'white'}}>
+                Refresh
+              </button>
+            </div>
+
+            {isTelegramLoading && telegramConnections.length === 0 ? (
+              <div style={{color:'var(--text-secondary)', marginTop:'1rem'}}>Memuat koneksi Telegram...</div>
+            ) : telegramConnections.length === 0 ? (
+              <div className="telegram-empty-state">
+                Belum ada koneksi Telegram. Setelah token dikirim ke bot dan diverifikasi, koneksi akan muncul di sini.
+              </div>
+            ) : (
+              <div style={{display:'flex', flexDirection:'column', gap:'0.75rem', marginTop:'1rem'}}>
+                {telegramConnections.map((connection) => (
+                  <div key={connection.id} className="telegram-connection-item">
+                    <div>
+                      <div style={{display:'flex', alignItems:'center', gap:'0.5rem', flexWrap:'wrap'}}>
+                        <strong>{connection.label || `Chat ${connection.telegram_chat_id}`}</strong>
+                        {connection.is_primary && <span className="telegram-badge">Primary</span>}
+                        {connection.is_verified && <span className="telegram-badge telegram-badge-success">Verified</span>}
+                      </div>
+                      <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.35rem'}}>
+                        chat_id: {connection.telegram_chat_id} • type: {connection.chat_type}
+                      </div>
+                      <div style={{fontSize:'0.8rem', color:'var(--text-secondary)', marginTop:'0.25rem'}}>
+                        Terhubung {new Date(connection.linked_at || connection.created_at).toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                    <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap', justifyContent:'flex-end'}}>
+                      {!connection.is_primary && (
+                        <button type="button" className="btn-primary" style={{color:'white', padding:'0.65rem 0.9rem'}} onClick={() => setPrimaryTelegramConnection(connection.id)}>
+                          Jadikan Primary
+                        </button>
+                      )}
+                      <button type="button" className="btn-danger" style={{padding:'0.65rem 0.9rem'}} onClick={() => unlinkTelegramConnection(connection.id)}>
+                        <Trash2 size={16} /> Unlink
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {settingsTab !== 'telegram' && (
+          <button className="btn-primary" style={{width: '100%', marginTop:'2rem', padding:'1rem', color:'white'}} onClick={saveSettings}>Save to Supabase</button>
+        )}
       </div>
     </div>
   );

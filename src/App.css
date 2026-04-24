@@ -203,10 +203,67 @@
 .tab.active { color: var(--accent-dark-green); border-bottom-color: var(--accent-dark-green); font-weight: 600; }
 .btn-danger { background: var(--danger-light); color: var(--danger); border: none; padding: 0.5rem; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
 .btn-primary { background: var(--accent-dark-green); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: opacity 0.2s; }
+.btn-primary:disabled,
+.btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
 .custom-checkbox { appearance: none; width: 24px; height: 24px; border: 2px solid var(--border-color); border-radius: 8px; cursor: pointer; display: grid; place-content: center; transition: all 0.2s; }
 .custom-checkbox::before { content: ""; width: 12px; height: 12px; transform: scale(0); transition: 120ms transform ease-in-out; transform-origin: center; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); }
 .custom-checkbox:checked { background-color: var(--success); border-color: var(--success); }
 .custom-checkbox:checked::before { transform: scale(1); }
+.telegram-settings-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: var(--hover-bg);
+  margin-bottom: 1rem;
+}
+.telegram-settings-title { font-size: 1rem; font-weight: 700; margin-bottom: 0.35rem; }
+.telegram-settings-copy { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; }
+.telegram-token-box {
+  background: var(--bg-input);
+  border: 1px dashed var(--border-color);
+  border-radius: 16px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.telegram-token-value {
+  font-size: 1.35rem;
+  letter-spacing: 0.18rem;
+  font-weight: 800;
+  color: var(--accent-dark-green);
+}
+.telegram-empty-state {
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+  border-radius: 16px;
+  padding: 1rem;
+  line-height: 1.5;
+}
+.telegram-connection-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: var(--hover-bg);
+}
+.telegram-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(33, 63, 49, 0.12);
+  color: var(--accent-dark-green);
+}
+.telegram-badge-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+}
 
 /* Chip Icon */
 .chip-icon { display: flex; gap: 4px; }

@@ -1,0 +1,199 @@
+{
+  "name": "Telegram Expense Ingest - One To Many",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -260,
+        0
+      ],
+      "id": "ea5c5df7-c22d-4dab-bbb1-294ebb9298d7",
+      "name": "Telegram Trigger",
+      "webhookId": "ee12820e-cf44-47d7-99dd-5de073223126",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "Anda adalah asisten pencatat keuangan. Ekstrak pesan pengguna dan keluarkan HANYA dalam format JSON baku dengan keys: name (string), amount (angka murni tanpa titik), account (string), dan category (string: pilih antara 'Needs', 'Wants', atau 'Savings')."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -40,
+        0
+      ],
+      "id": "5cb2717f-1736-4009-af93-222e6b9cbdfa",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-flash-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        180
+      ],
+      "id": "b3225ffc-dc05-4a64-a997-9bf2c411ec39",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "X8mAJa2T43DFtyRq",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let aiResponse = $input.first().json.output;\n\nif (!aiResponse) {\n  return { error: 'Tidak ada respon dari AI' };\n}\n\nlet cleanText = aiResponse\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\ntry {\n  let parsedData = JSON.parse(cleanText);\n  parsedData.date = new Date().toLocaleDateString('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  });\n  parsedData.is_paid = true;\n  return parsedData;\n} catch (error) {\n  return {\n    error: 'AI gagal menghasilkan format JSON yang valid',\n    original_text: aiResponse,\n    details: error.message\n  };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "ab207980-374f-4b39-acfc-c1f678800fc2",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-expense-ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"telegram_chat_id\": {{ $('Telegram Trigger').item.json.message.chat.id }},\n  \"telegram_user_id\": {{ $('Telegram Trigger').item.json.message.from.id }},\n  \"name\": \"{{ $json.name }}\",\n  \"amount\": {{ $json.amount }},\n  \"account\": \"{{ $json.account }}\",\n  \"category\": \"{{ $json.category }}\",\n  \"is_paid\": true,\n  \"date\": \"{{ $now.setZone('Asia/Jakarta').toFormat('MMM d, yyyy') }}\",\n  \"budget_month\": \"{{ $now.setZone('Asia/Jakarta').toFormat('yyyy-MM') }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        0
+      ],
+      "id": "1daf574c-eddd-40c2-a14a-9933f44c7bd0",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=✅ Berhasil dicatat!\\n📝 Item: {{ $('Code').item.json.name }}\\n💸 Nominal: Rp{{ $('Code').item.json.amount.toLocaleString('id-ID') }}\\n🏦 Akun: {{ $('Code').item.json.account }}\\n📂 Kategori: {{ $('Code').item.json.category }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        740,
+        0
+      ],
+      "id": "f1654717-9743-476b-aefb-fcf1f53fd14d",
+      "name": "Send a text message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
