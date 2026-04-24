@@ -4,6 +4,7 @@ File workflow yang sudah disesuaikan untuk sistem multi-user ada di:
 
 - `n8n/telegram-expense-workflow.one-to-many.json`
 - `n8n/telegram-link-workflow.one-to-many.json`
+- `n8n/telegram-main-workflow.contextual.json`
 
 ## Cara kerja
 
@@ -14,6 +15,15 @@ File workflow yang sudah disesuaikan untuk sistem multi-user ada di:
 5. Workflow linking memanggil Supabase Edge Function `telegram-link` dengan action `consume_token`.
 6. Setelah koneksi terverifikasi, workflow transaksi akan mengirim data ke `telegram-expense-ingest`.
 7. Function tersebut mencari `telegram_chat_id` yang terhubung lalu menyimpan expense ke `user_id` yang benar.
+
+## Workflow yang disarankan
+
+Untuk bot Telegram yang sama, paling aman gunakan satu workflow utama:
+
+1. `telegram-main-workflow.contextual.json`
+   Satu `Telegram Trigger`
+   Menangani `/start TOKEN` dan pesan transaksi biasa dalam satu alur
+   Sudah menambahkan lookup context user dari `telegram_connections` dan `app_settings` sebelum AI parsing
 
 ## Pemisahan workflow
 
@@ -31,6 +41,7 @@ Gunakan 2 workflow terpisah:
 
 - Linking: `https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-link`
 - Ingest expense: `https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-expense-ingest`
+- Parser context: `https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-parser-context`
 
 ## QR code di aplikasi
 
@@ -70,3 +81,4 @@ Saat QR di-scan, user akan langsung dibawa ke bot Telegram dengan payload token 
 - Satu user bisa punya banyak koneksi Telegram.
 - Salah satu koneksi bisa dijadikan `primary` dari aplikasi.
 - Workflow transaksi sekarang menahan request jika `name`, `amount`, `account`, atau `category` belum valid.
+- Workflow contextual menambahkan daftar `accounts` dan `categories` user ke prompt AI agar parser tidak mengarang kantong atau kategori baru.

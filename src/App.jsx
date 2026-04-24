@@ -937,36 +937,21 @@ function App() {
     return (
       <div className="login-screen">
         <div className="login-shell">
-          <section className="login-brand-panel">
-            <div className="login-brand-mark">
-              <AlkaFlowLogoMark size={104} />
-            </div>
-            <div className="login-brand-copy">
-              <AlkaFlowWordmark />
-              <p className="login-brand-tagline">TRACK YOUR MONEY. EFFORTLESSLY.</p>
-            </div>
-            <div className="login-brand-orbit" aria-hidden="true">
-              <div className="login-brand-orbit-ring"></div>
-              <div className="login-brand-orbit-ring secondary"></div>
-              <div className="login-brand-orbit-core">
-                <AlkaFlowLogoMark size={78} />
-              </div>
-            </div>
-          </section>
-
           <section className="login-card">
             <div className="login-card-header">
-              <div className="login-logo-row">
-                <AlkaFlowLogoMark size={46} className="login-logo-icon" />
-                <div>
-                  <AlkaFlowWordmark compact />
-                  <p className="login-logo-caption">Secure sign in for your budgeting workspace</p>
+              <div className="login-brand-mark compact">
+                <div className="login-brand-orbit" aria-hidden="true">
+                  <div className="login-brand-orbit-ring"></div>
+                  <div className="login-brand-orbit-ring secondary"></div>
+                  <div className="login-brand-orbit-core">
+                    <AlkaFlowLogoMark size={58} />
+                  </div>
                 </div>
               </div>
-              <div>
-                <h1 className="login-title">Welcome back</h1>
-                <p className="login-subtitle">Sign in to continue managing your money flow.</p>
-              </div>
+              <AlkaFlowWordmark compact />
+              <p className="login-brand-tagline compact">TRACK YOUR MONEY. EFFORTLESSLY.</p>
+              <h1 className="login-title">Welcome back</h1>
+              <p className="login-subtitle">Sign in to continue.</p>
             </div>
 
             <form onSubmit={handleLogin}>

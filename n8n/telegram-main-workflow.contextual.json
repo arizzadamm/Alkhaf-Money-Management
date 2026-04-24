@@ -1,0 +1,643 @@
+{
+  "name": "Telegram Main Workflow - Contextual Parser",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1180,
+        260
+      ],
+      "id": "a1e83ee6-1e99-4386-b345-111111111111",
+      "name": "Telegram Trigger",
+      "webhookId": "ee12820e-cf44-47d7-99dd-5de073223126",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const message = $input.first().json.message || {};\nconst rawText = String(message.text || '').trim();\nconst startMatch = rawText.match(/^\\/start(?:\\s+(.+))?$/i);\n\nreturn {\n  raw_text: rawText,\n  is_start_command: Boolean(startMatch),\n  start_token: startMatch?.[1] ? String(startMatch[1]).trim().toUpperCase() : '',\n  has_token: Boolean(startMatch?.[1]),\n  telegram_chat_id: message.chat?.id || null,\n  telegram_user_id: message.from?.id || null,\n  chat_type: message.chat?.type || 'private',\n  label: message.chat?.title || message.from?.username || message.from?.first_name || null\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -950,
+        260
+      ],
+      "id": "1f55bf32-8e94-4884-9222-222222222222",
+      "name": "Normalize Message"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-is-start",
+              "leftValue": "={{ $json.is_start_command }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -720,
+        260
+      ],
+      "id": "4d32df8d-c120-45d5-8333-333333333333",
+      "name": "Is Start Command?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-has-token",
+              "leftValue": "={{ $json.has_token }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -490,
+        120
+      ],
+      "id": "126341f8-662f-42fe-8444-444444444444",
+      "name": "Has Start Token?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-link",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"consume_token\",\n  \"token\": \"{{ $('Normalize Message').item.json.start_token }}\",\n  \"telegramChatId\": {{ $('Normalize Message').item.json.telegram_chat_id }},\n  \"telegramUserId\": {{ $('Normalize Message').item.json.telegram_user_id }},\n  \"chatType\": \"{{ $('Normalize Message').item.json.chat_type }}\",\n  \"label\": \"{{ $('Normalize Message').item.json.label || '' }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -250,
+        40
+      ],
+      "id": "89099673-0d61-49cb-9555-555555555555",
+      "name": "Consume Link Token"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Token linking tidak ditemukan. Buka menu Profile > Telegram di AlkaFlow, generate token baru, lalu scan QR atau kirim /start TOKEN lagi.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -250,
+        200
+      ],
+      "id": "a022b1d9-bd2f-442e-8666-666666666666",
+      "name": "Send Missing Token Message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=✅ Telegram berhasil terhubung ke akun AlkaFlow Anda. Mulai sekarang Anda bisa kirim transaksi langsung lewat chat ini.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -20,
+        40
+      ],
+      "id": "30861834-7f12-4544-8777-777777777777",
+      "name": "Send Link Success Message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-parser-context",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"telegram_chat_id\": {{ $('Normalize Message').item.json.telegram_chat_id }},\n  \"telegram_user_id\": {{ $('Normalize Message').item.json.telegram_user_id }}\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -490,
+        420
+      ],
+      "id": "4f8dd7f8-5d42-4b67-9888-888888888888",
+      "name": "Resolve Parser Context"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nconst data = payload.data || null;\n\nif (!data?.user?.id) {\n  return {\n    ok: false,\n    message: payload.error || 'Chat Telegram ini belum terhubung ke akun AlkaFlow.'\n  };\n}\n\nconst accountAliases = (name) => {\n  const lower = String(name || '').trim().toLowerCase();\n  const compact = lower.replace(/\\s+/g, ' ');\n  return Array.from(new Set([lower, compact].filter(Boolean)));\n};\n\nconst accounts = (data.settings?.accounts || []).map((item) => ({\n  id: item.id,\n  name: item.name,\n  aliases: accountAliases(item.name)\n}));\n\nconst categories = (data.settings?.categories || []).map((item) => ({\n  id: item.id,\n  name: item.name,\n  aliases: accountAliases(item.name)\n}));\n\ncategories.push(\n  { id: 'cat-system-income', name: 'Income', aliases: ['income', 'gaji', 'pemasukan'] },\n  { id: 'cat-system-transfer', name: 'Transfer', aliases: ['transfer', 'pindah saldo'] }\n);\n\nreturn {\n  ok: true,\n  message: $('Normalize Message').item.json.raw_text,\n  user: data.user,\n  connection: data.connection,\n  settings: data.settings,\n  accounts,\n  categories\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -250,
+        420
+      ],
+      "id": "7e5fa994-b01f-4e7a-9999-999999999999",
+      "name": "Build Parser Payload"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-context-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -20,
+        420
+      ],
+      "id": "3593e7ff-77b8-43f3-aaaa-aaaaaaaaaaaa",
+      "name": "Parser Context Ready?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.message || 'Chat Telegram ini belum terhubung ke akun AlkaFlow. Buka Profile > Telegram lalu lakukan linking lebih dulu.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        520
+      ],
+      "id": "8f7a3412-2093-47b1-abab-bbbbbbbbbbbb",
+      "name": "Send Context Missing Message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "options": {
+          "systemMessage": "=Anda adalah parser transaksi AlkaFlow. Gunakan hanya akun dan kategori yang tersedia pada context user. Jangan membuat akun baru atau kategori baru. Jika account atau category tidak jelas, set needs_clarification=true. Balas HANYA JSON valid dengan format: {\"is_transaction\":true,\"needs_clarification\":false,\"transaction_type\":\"expense\",\"name\":\"\",\"amount\":0,\"account\":{\"id\":\"\",\"name\":\"\"},\"category\":{\"id\":\"\",\"name\":\"\"},\"is_paid\":true,\"date\":\"{{ $now.setZone('Asia/Jakarta').toFormat('MMM d, yyyy') }}\",\"budget_month\":\"{{ $json.user.budget_month }}\",\"notes\":\"\",\"confidence\":0}. Context accounts: {{ JSON.stringify($json.accounts) }}. Context categories: {{ JSON.stringify($json.categories) }}."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        360
+      ],
+      "id": "60d92919-a59b-4f0c-acac-cccccccccccc",
+      "name": "AI Transaction Parser"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-flash-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        220,
+        620
+      ],
+      "id": "4424c683-8ca9-4dfa-adad-dddddddddddd",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "X8mAJa2T43DFtyRq",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first().json.output;\nconst parserContext = $('Build Parser Payload').item.json;\n\nif (!aiResponse) {\n  return {\n    ok: false,\n    message: 'Bot belum bisa membaca transaksi Anda. Coba tulis seperti: makan siang 25000 pakai BCA Demo kategori Needs.'\n  };\n}\n\nconst cleanText = String(aiResponse)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\ntry {\n  const parsed = JSON.parse(cleanText);\n  const accounts = parserContext.accounts || [];\n  const categories = parserContext.categories || [];\n  const accountName = String(parsed.account?.name || parsed.account || '').trim();\n  const categoryName = String(parsed.category?.name || parsed.category || '').trim();\n  const account = accounts.find((item) => item.name === accountName);\n  const category = categories.find((item) => item.name === categoryName);\n  const confidence = Number(parsed.confidence || 0);\n  const needsClarification = Boolean(parsed.needs_clarification);\n  const isTransaction = parsed.is_transaction !== false;\n  const normalized = {\n    name: String(parsed.name || '').trim(),\n    amount: Number(parsed.amount || 0),\n    account: account?.name || '',\n    category: category?.name || '',\n    is_paid: parsed.is_paid !== false,\n    date: String(parsed.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })),\n    budget_month: String(parsed.budget_month || parserContext.user?.budget_month || new Date().toISOString().slice(0, 7)),\n    notes: String(parsed.notes || ''),\n    confidence\n  };\n\n  const valid = isTransaction && !needsClarification && normalized.name && normalized.amount > 0 && normalized.account && normalized.category && confidence >= 0.75;\n\n  if (!valid) {\n    return {\n      ok: false,\n      message: normalized.account || normalized.category\n        ? 'Saya masih butuh sedikit klarifikasi. Tulis transaksi dengan item, nominal, kantong, dan kategori yang jelas. Contoh: kopi 18000 pakai Cash Demo kategori Wants.'\n        : 'Saya belum yakin transaksi ini masuk ke kantong atau kategori mana. Coba sebutkan kantong dan kategorinya langsung.',\n      parsed_preview: normalized,\n      original_text: cleanText\n    };\n  }\n\n  return {\n    ok: true,\n    ...normalized\n  };\n} catch (error) {\n  return {\n    ok: false,\n    message: 'Format transaksi belum bisa dipahami. Coba kirim dengan nominal, kantong, dan kategori yang jelas.',\n    details: error.message,\n    original_text: cleanText\n  };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        360
+      ],
+      "id": "8ddca5d5-3a50-4f0f-aeae-eeeeeeeeeeee",
+      "name": "Validate Parsed Transaction"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valid-transaction",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        360
+      ],
+      "id": "72cbbac7-56b5-47d0-afaf-ffffffffffff",
+      "name": "Transaction Ready?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tnmosbaqgmxtcajblodu.supabase.co/functions/v1/telegram-expense-ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_dOSbx08BETURzqgInRZmow_8gBHMdAI"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"telegram_chat_id\": {{ $('Normalize Message').item.json.telegram_chat_id }},\n  \"telegram_user_id\": {{ $('Normalize Message').item.json.telegram_user_id }},\n  \"name\": \"{{ $json.name }}\",\n  \"amount\": {{ $json.amount }},\n  \"account\": \"{{ $json.account }}\",\n  \"category\": \"{{ $json.category }}\",\n  \"is_paid\": {{ $json.is_paid }},\n  \"date\": \"{{ $json.date }}\",\n  \"budget_month\": \"{{ $json.budget_month }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        300
+      ],
+      "id": "d3755f45-aa4d-44b8-b0b0-101010101010",
+      "name": "Ingest Expense"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=✅ Berhasil dicatat!\\n📝 Item: {{ $('Validate Parsed Transaction').item.json.name }}\\n💸 Nominal: Rp{{ $('Validate Parsed Transaction').item.json.amount.toLocaleString('id-ID') }}\\n🏦 Kantong: {{ $('Validate Parsed Transaction').item.json.account }}\\n📂 Kategori: {{ $('Validate Parsed Transaction').item.json.category }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1180,
+        300
+      ],
+      "id": "f9da2b85-1466-497d-b1b1-111213141516",
+      "name": "Send Expense Success Message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.message || 'Format transaksi belum lengkap. Coba lagi dengan item, nominal, kantong, dan kategori yang jelas.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        940,
+        460
+      ],
+      "id": "6d3e77cc-5d9f-4fd6-b2b2-212223242526",
+      "name": "Send Clarification Message",
+      "webhookId": "8504c943-0ce5-439d-a779-40f5f291e9ad",
+      "credentials": {
+        "telegramApi": {
+          "id": "bxBaosytOOM3zirA",
+          "name": "ARZ telegram Boy"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Message": {
+      "main": [
+        [
+          {
+            "node": "Is Start Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Start Command?": {
+      "main": [
+        [
+          {
+            "node": "Has Start Token?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolve Parser Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Start Token?": {
+      "main": [
+        [
+          {
+            "node": "Consume Link Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Missing Token Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consume Link Token": {
+      "main": [
+        [
+          {
+            "node": "Send Link Success Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Parser Context": {
+      "main": [
+        [
+          {
+            "node": "Build Parser Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Parser Payload": {
+      "main": [
+        [
+          {
+            "node": "Parser Context Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser Context Ready?": {
+      "main": [
+        [
+          {
+            "node": "AI Transaction Parser",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Context Missing Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Transaction Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Transaction Parser": {
+      "main": [
+        [
+          {
+            "node": "Validate Parsed Transaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Parsed Transaction": {
+      "main": [
+        [
+          {
+            "node": "Transaction Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transaction Ready?": {
+      "main": [
+        [
+          {
+            "node": "Ingest Expense",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Clarification Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Expense": {
+      "main": [
+        [
+          {
+            "node": "Send Expense Success Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
