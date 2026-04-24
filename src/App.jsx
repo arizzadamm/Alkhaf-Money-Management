@@ -944,31 +944,12 @@ function App() {
             <div className="login-brand-copy">
               <AlkaFlowWordmark />
               <p className="login-brand-tagline">TRACK YOUR MONEY. EFFORTLESSLY.</p>
-              <p className="login-brand-description">
-                AlkaFlow helps you track income, expenses, and account movement in one clean flow. Built for speed, clarity, and everyday financial confidence.
-              </p>
             </div>
-            <div className="login-brand-highlights">
-              <div className="login-highlight-card">
-                <div className="login-highlight-icon"><CheckCircle2 size={18} /></div>
-                <div>
-                  <strong>Auto categorize</strong>
-                  <span>Keep transaction tracking tidy and consistent.</span>
-                </div>
-              </div>
-              <div className="login-highlight-card">
-                <div className="login-highlight-icon"><ArrowRightLeft size={18} /></div>
-                <div>
-                  <strong>Track every flow</strong>
-                  <span>Income, expenses, and transfers stay visible.</span>
-                </div>
-              </div>
-              <div className="login-highlight-card">
-                <div className="login-highlight-icon"><Target size={18} /></div>
-                <div>
-                  <strong>Focused on goals</strong>
-                  <span>See progress clearly with a calm dashboard.</span>
-                </div>
+            <div className="login-brand-orbit" aria-hidden="true">
+              <div className="login-brand-orbit-ring"></div>
+              <div className="login-brand-orbit-ring secondary"></div>
+              <div className="login-brand-orbit-core">
+                <AlkaFlowLogoMark size={78} />
               </div>
             </div>
           </section>
