@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun, Target, Eye, ChevronRight, Users } from 'lucide-react';
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import QRCode from 'qrcode';
 import { supabase } from './supabaseClient';
 import './App.css';
@@ -11,6 +11,52 @@ const formatIDR = (amount) => {
     currency: 'IDR',
     minimumFractionDigits: 0
   }).format(Number(amount) || 0);
+};
+
+const parseTransactionDate = (transaction) => {
+  const rawDate = transaction.created_at || transaction.date;
+  const parsedDate = rawDate ? new Date(rawDate) : new Date();
+  return Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+};
+
+const getTransactionType = (transaction) => {
+  if (transaction.category === 'Income' || transaction.category === 'Transfer In') return 'income';
+  if (transaction.category === 'Transfer Out') return 'transfer';
+  return 'expense';
+};
+
+const formatPeriodLabel = (date, period) => {
+  if (period === 'month') {
+    return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  }
+
+  if (period === 'week') {
+    const weekStart = new Date(date);
+    const day = weekStart.getDay() || 7;
+    weekStart.setDate(weekStart.getDate() - day + 1);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    return `${weekStart.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`;
+  }
+
+  return date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
+};
+
+const getPeriodKey = (date, period) => {
+  const keyDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (period === 'month') {
+    return `${keyDate.getFullYear()}-${String(keyDate.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  if (period === 'week') {
+    const day = keyDate.getDay() || 7;
+    keyDate.setDate(keyDate.getDate() - day + 1);
+  }
+
+  return keyDate.toISOString().slice(0, 10);
 };
 
 const getInitial = (name) => name ? name.charAt(0).toUpperCase() : '?';
@@ -125,6 +171,7 @@ function App() {
   
   const [monthOffset, setMonthOffset] = useState(0); 
   const [searchQuery, setSearchQuery] = useState('');
+  const [transactionGroupBy, setTransactionGroupBy] = useState('day');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const isAdmin = user?.role === 'admin';
   
@@ -160,21 +207,25 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const savedSession = localStorage.getItem(SESSION_STORAGE_KEY) || sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (savedSession) {
-      const parsedUser = JSON.parse(savedSession);
-      setUser(parsedUser);
-      setActiveView(parsedUser.role === 'admin' ? 'admin' : 'home');
-    }
+    const handle = window.setTimeout(() => {
+      const savedSession = localStorage.getItem(SESSION_STORAGE_KEY) || sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (savedSession) {
+        const parsedUser = JSON.parse(savedSession);
+        setUser(parsedUser);
+        setActiveView(parsedUser.role === 'admin' ? 'admin' : 'home');
+      }
 
-    const savedRememberMe = localStorage.getItem(REMEMBER_ME_KEY);
-    if (savedRememberMe !== null) setRememberMe(savedRememberMe === 'true');
+      const savedRememberMe = localStorage.getItem(REMEMBER_ME_KEY);
+      if (savedRememberMe !== null) setRememberMe(savedRememberMe === 'true');
 
-    const savedTheme = localStorage.getItem('alkhaf_theme');
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true);
-      document.documentElement.setAttribute('data-theme', 'dark');
-    }
+      const savedTheme = localStorage.getItem('alkhaf_theme');
+      if (savedTheme === 'dark') {
+        setIsDarkMode(true);
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    }, 0);
+
+    return () => window.clearTimeout(handle);
   }, []);
 
   const toggleTheme = () => {
@@ -189,23 +240,7 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      setIsLoading(true);
-      if (user.role === 'admin') {
-        fetchAdminUsers().finally(() => setIsLoading(false));
-        return;
-      }
-
-      Promise.all([
-        fetchSettings(),
-        fetchTransactions(),
-        fetchGlobalTransactions()
-      ]).finally(() => setIsLoading(false));
-    }
-  }, [user, monthOffset]);
-
-  const invokeFinanceAction = async (action, payload = {}) => {
+  const invokeFinanceAction = useCallback(async (action, payload = {}) => {
     if (!user?.id) return { error: 'User tidak ditemukan.' };
 
     const sessionProof = getStoredSessionProof();
@@ -225,9 +260,9 @@ function App() {
     }
 
     return { data: data?.data };
-  };
+  }, [user]);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     if (!user?.id) return;
 
     const result = await invokeFinanceAction('get_settings');
@@ -248,9 +283,9 @@ function App() {
       setCategories([]);
       setGoals([]);
     }
-  };
+  }, [invokeFinanceAction, user]);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     if (!user?.id) return;
 
     const result = await invokeFinanceAction('list_transactions', {
@@ -266,9 +301,9 @@ function App() {
       const mapped = data.map(d => ({ ...d, isPaid: d.is_paid }));
       setTransactions(mapped);
     }
-  };
+  }, [activeBudgetMonth, invokeFinanceAction, user]);
 
-  const fetchGlobalTransactions = async () => {
+  const fetchGlobalTransactions = useCallback(async () => {
     if (!user?.id) return;
 
     const result = await invokeFinanceAction('list_global_transactions');
@@ -279,7 +314,7 @@ function App() {
 
     const data = result.data || [];
     if (data) setGlobalTransactions(data);
-  };
+  }, [invokeFinanceAction, user]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -328,7 +363,7 @@ function App() {
       }
 
       storeSessionProof(passwordHash, rememberMe);
-    } catch (err) {
+    } catch {
       setLoginError('Terjadi kesalahan koneksi database.');
     }
   };
@@ -352,7 +387,7 @@ function App() {
     sessionStorage.removeItem(SESSION_PROOF_KEY);
   };
 
-  const fetchAdminUsers = async () => {
+  const fetchAdminUsers = useCallback(async () => {
     if (!isAdmin) return;
 
     const sessionProof = getStoredSessionProof();
@@ -375,14 +410,34 @@ function App() {
     }
 
     setAdminUsers(data?.data || []);
-  };
+  }, [isAdmin, user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const handle = window.setTimeout(() => {
+      setIsLoading(true);
+      if (user.role === 'admin') {
+        fetchAdminUsers().finally(() => setIsLoading(false));
+        return;
+      }
+
+      Promise.all([
+        fetchSettings(),
+        fetchTransactions(),
+        fetchGlobalTransactions()
+      ]).finally(() => setIsLoading(false));
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [fetchAdminUsers, fetchGlobalTransactions, fetchSettings, fetchTransactions, user, monthOffset]);
 
   const resetTelegramFeedback = () => {
     setTelegramError('');
     setTelegramSuccess('');
   };
 
-  const invokeTelegramLinkAction = async (action, payload = {}) => {
+  const invokeTelegramLinkAction = useCallback(async (action, payload = {}) => {
     if (!user?.id) return { error: 'User tidak ditemukan.' };
 
     const sessionProof = getStoredSessionProof();
@@ -402,9 +457,9 @@ function App() {
     }
 
     return { data: data?.data };
-  };
+  }, [user]);
 
-  const fetchTelegramConnections = async () => {
+  const fetchTelegramConnections = useCallback(async () => {
     if (!user?.id || isAdmin) return;
 
     setIsTelegramLoading(true);
@@ -419,7 +474,7 @@ function App() {
 
     setTelegramConnections(result.data || []);
     setIsTelegramLoading(false);
-  };
+  }, [invokeTelegramLinkAction, isAdmin, user]);
 
   const generateTelegramLinkToken = async () => {
     if (!user?.id || isAdmin) return;
@@ -728,10 +783,68 @@ function App() {
     return transactions.filter(t => t.name.toLowerCase().includes(lowerQ) || t.category.toLowerCase().includes(lowerQ) || t.account.toLowerCase().includes(lowerQ));
   }, [transactions, searchQuery]);
 
+  const groupedTransactions = useMemo(() => {
+    const groups = new Map();
+
+    filteredTransactions.forEach((transaction) => {
+      const transactionDate = parseTransactionDate(transaction);
+      const key = getPeriodKey(transactionDate, transactionGroupBy);
+      const type = getTransactionType(transaction);
+      const amount = Number(transaction.amount) || 0;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          date: transactionDate,
+          label: formatPeriodLabel(transactionDate, transactionGroupBy),
+          transactions: [],
+          income: 0,
+          expense: 0,
+          transfer: 0,
+          count: 0
+        });
+      }
+
+      const group = groups.get(key);
+      group.transactions.push(transaction);
+      group.count += 1;
+
+      if (type === 'income') group.income += amount;
+      else if (type === 'transfer') group.transfer += amount;
+      else group.expense += amount;
+    });
+
+    return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key));
+  }, [filteredTransactions, transactionGroupBy]);
+
+  const transactionChartData = useMemo(() => {
+    return [...groupedTransactions]
+      .reverse()
+      .map((group) => ({
+        label: group.label,
+        Income: group.income,
+        Expense: group.expense,
+        Net: group.income - group.expense
+      }));
+  }, [groupedTransactions]);
+
+  const transactionPeriodSummary = useMemo(() => {
+    return groupedTransactions.reduce((summary, group) => ({
+      income: summary.income + group.income,
+      expense: summary.expense + group.expense,
+      transfer: summary.transfer + group.transfer,
+      count: summary.count + group.count
+    }), { income: 0, expense: 0, transfer: 0, count: 0 });
+  }, [groupedTransactions]);
+
   useEffect(() => {
     if (!user || isAdmin || activeView !== 'profile') return;
-    fetchTelegramConnections();
-  }, [user, isAdmin, activeView]);
+    const handle = window.setTimeout(() => {
+      fetchTelegramConnections();
+    }, 0);
+
+    return () => window.clearTimeout(handle);
+  }, [activeView, fetchTelegramConnections, isAdmin, user]);
 
   const telegramStartLink = useMemo(() => {
     if (!telegramLinkToken?.token) return '';
@@ -766,7 +879,7 @@ function App() {
         });
 
         if (!cancelled) setTelegramQrCode(url);
-      } catch (error) {
+      } catch {
         if (!cancelled) setTelegramQrCode('');
       }
     };
@@ -804,7 +917,6 @@ function App() {
     return current;
   }, [globalTransactions, accounts]);
 
-  const nonAllocated = effectiveTotalIncome - totals.allocated;
   const sumOfAccounts = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
   const sumOfCategories = categories.reduce((sum, cat) => sum + Number(cat.targetPercentage), 0);
   const usagePercentage = effectiveTotalIncome > 0 ? ((totals.allocated / effectiveTotalIncome) * 100).toFixed(1) : 0;
@@ -1251,33 +1363,141 @@ function App() {
             </div>
           </>
         ) : activeView === 'transactions' ? (
-          <div className="widget-card" style={{minHeight: '600px'}}>
-             <div className="widget-header" style={{borderBottom:'1px solid var(--border-color)', paddingBottom:'1.5rem'}}>
-              <span className="widget-title">Transactions List ({filteredTransactions.length})</span>
-              <div style={{display:'flex', gap:'0.5rem'}}>
-                <button className="btn-primary" onClick={() => setIsTransferOpen(true)} style={{background:'var(--accent-blue-gray)', color: '#fff'}}><ArrowRightLeft size={16}/> Transfer</button>
-                <button className="btn-primary" onClick={() => setIsAddOpen(true)} style={{color: '#fff'}}><Plus size={16}/> Add Expense</button>
-                <button className="btn-primary" style={{background:'var(--success)', color: '#fff'}} onClick={() => setIsTopUpOpen(true)}><ArrowUpRight size={16}/> Top Up</button>
+          <div className="transactions-workspace">
+            <section className="widget-card transactions-list-panel">
+              <div className="widget-header transactions-toolbar">
+                <div>
+                  <span className="widget-title">Transactions List ({filteredTransactions.length})</span>
+                  <div className="transactions-toolbar-subtitle">{groupedTransactions.length} periode di {viewMonthName}</div>
+                </div>
+                <div className="transactions-toolbar-actions">
+                  <div className="period-toggle" aria-label="Group transactions">
+                    {[
+                      { value: 'day', label: 'Harian' },
+                      { value: 'week', label: 'Mingguan' },
+                      { value: 'month', label: 'Bulanan' }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={transactionGroupBy === option.value ? 'active' : ''}
+                        onClick={() => setTransactionGroupBy(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button className="btn-primary" onClick={() => setIsTransferOpen(true)} style={{background:'var(--accent-blue-gray)', color: '#fff'}}><ArrowRightLeft size={16}/> Transfer</button>
+                  <button className="btn-primary" onClick={() => setIsAddOpen(true)} style={{color: '#fff'}}><Plus size={16}/> Add Expense</button>
+                  <button className="btn-primary" style={{background:'var(--success)', color: '#fff'}} onClick={() => setIsTopUpOpen(true)}><ArrowUpRight size={16}/> Top Up</button>
+                </div>
               </div>
-            </div>
-            <table className="full-transactions-table">
-              <thead>
-                <tr><th style={{width:'60px'}}>Status</th><th>Date</th><th>Name</th><th>Account</th><th>Category</th><th style={{textAlign:'right'}}>Amount</th><th style={{width:'60px'}}></th></tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.map(tx => (
-                  <tr key={tx.id}>
-                    <td>{tx.category === 'Income' || tx.category.includes('Transfer') ? <CheckCircle2 size={16} color="var(--success)"/> : <input type="checkbox" className="custom-checkbox" checked={tx.isPaid} onChange={() => togglePaid(tx.id, tx.isPaid)} />}</td>
-                    <td style={{color:'var(--text-secondary)'}}>{tx.date}</td>
-                    <td>{tx.name}</td>
-                    <td>{tx.account}</td>
-                    <td>{tx.category}</td>
-                    <td style={{textAlign:'right', color: tx.category === 'Income' || tx.category === 'Transfer In' ? 'var(--success)' : 'inherit'}}>{formatIDR(tx.amount)}</td>
-                    <td style={{textAlign:'right'}}><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)'}} onClick={() => removeTransaction(tx.id)}><Trash2 size={18}/></button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+              {groupedTransactions.length === 0 ? (
+                <div className="transactions-empty-state">Belum ada transaksi untuk filter ini.</div>
+              ) : (
+                <div className="transactions-group-list">
+                  {groupedTransactions.map((group) => (
+                    <section className="transaction-period-group" key={group.key}>
+                      <div className="transaction-period-header">
+                        <div>
+                          <h3>{group.label}</h3>
+                          <span>{group.count} transaksi</span>
+                        </div>
+                        <div className="transaction-period-totals">
+                          <span className="income">+ {formatIDR(group.income)}</span>
+                          <span className="expense">- {formatIDR(group.expense)}</span>
+                        </div>
+                      </div>
+                      <table className="full-transactions-table">
+                        <thead>
+                          <tr><th style={{width:'60px'}}>Status</th><th>Date</th><th>Name</th><th>Account</th><th>Category</th><th style={{textAlign:'right'}}>Amount</th><th style={{width:'60px'}}></th></tr>
+                        </thead>
+                        <tbody>
+                          {group.transactions.map(tx => (
+                            <tr key={tx.id}>
+                              <td>{tx.category === 'Income' || tx.category.includes('Transfer') ? <CheckCircle2 size={16} color="var(--success)"/> : <input type="checkbox" className="custom-checkbox" checked={tx.isPaid} onChange={() => togglePaid(tx.id, tx.isPaid)} />}</td>
+                              <td style={{color:'var(--text-secondary)'}}>{tx.date}</td>
+                              <td>{tx.name}</td>
+                              <td>{tx.account}</td>
+                              <td>{tx.category}</td>
+                              <td style={{textAlign:'right', color: tx.category === 'Income' || tx.category === 'Transfer In' ? 'var(--success)' : 'inherit'}}>{formatIDR(tx.amount)}</td>
+                              <td style={{textAlign:'right'}}><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)'}} onClick={() => removeTransaction(tx.id)}><Trash2 size={18}/></button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <aside className="transactions-chart-panel">
+              <div className="widget-card">
+                <div className="widget-header">
+                  <span className="widget-title">Cashflow Chart</span>
+                  <button type="button" className="see-all" onClick={exportToCSV} style={{background:'none', border:'none'}}>
+                    <Download size={16} /> Export
+                  </button>
+                </div>
+                <div className="transactions-chart-summary">
+                  <div>
+                    <span>Income</span>
+                    <strong className="income">{formatIDR(transactionPeriodSummary.income)}</strong>
+                  </div>
+                  <div>
+                    <span>Expense</span>
+                    <strong className="expense">{formatIDR(transactionPeriodSummary.expense)}</strong>
+                  </div>
+                  <div>
+                    <span>Net</span>
+                    <strong>{formatIDR(transactionPeriodSummary.income - transactionPeriodSummary.expense)}</strong>
+                  </div>
+                </div>
+                <div className="transactions-chart">
+                  {transactionChartData.length === 0 ? (
+                    <div className="transactions-empty-state compact">Tidak ada data grafik.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={transactionChartData} margin={{ top: 8, right: 8, left: -18, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
+                        <RechartsTooltip formatter={(value) => formatIDR(value)} />
+                        <Bar dataKey="Income" fill="var(--success)" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="Expense" fill="var(--danger)" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+
+              <div className="widget-card transactions-breakdown-card">
+                <div className="widget-header">
+                  <span className="widget-title">Period Breakdown</span>
+                </div>
+                <div className="transactions-breakdown-list">
+                  {groupedTransactions.slice(0, 6).map((group) => {
+                    const total = group.income + group.expense || 1;
+                    const expensePercent = Math.round((group.expense / total) * 100);
+
+                    return (
+                      <div className="transactions-breakdown-item" key={group.key}>
+                        <div>
+                          <strong>{group.label}</strong>
+                          <span>{group.count} transaksi</span>
+                        </div>
+                        <div className="transactions-breakdown-bar">
+                          <span style={{width: `${expensePercent}%`}}></span>
+                        </div>
+                        <small>{formatIDR(group.expense)} expense</small>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </aside>
           </div>
         ) : activeView === 'admin' ? (
           <div style={{display:'grid', gridTemplateColumns:'1.1fr 1.4fr', gap:'1.5rem'}}>
