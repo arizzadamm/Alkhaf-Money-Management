@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+﻿import { useState, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { parseTransactionDate, getTransactionType, formatPeriodLabel, getPeriodKey, formatIDR } from '../utils/formatters';
 import { CHART_COLORS } from '../utils/constants';
@@ -31,8 +31,14 @@ export function useFinance(user, addToast, getStoredSessionProof) {
   const [showTotalBalance, setShowTotalBalance] = useState(false);
 
 
-  // Billing cut-off date (1-28, default 1 = standard calendar month)
+  // Billing cut-off date
   const [cutoffDate, setCutoffDate] = useState(1);
+
+  // AI Features
+  const [monthlyInsight, setMonthlyInsight] = useState(null);
+  const [isInsightLoading, setIsInsightLoading] = useState(false);
+  const [smartSuggestion, setSmartSuggestion] = useState(null);
+  const [isSmartLoading, setIsSmartLoading] = useState(false);
   // Undo delete
   const pendingDeleteRef = useRef(null);
 
@@ -88,33 +94,7 @@ export function useFinance(user, addToast, getStoredSessionProof) {
     });
 
     if (error || data?.error) {
-      // --- AI: Monthly Insight ---
-  const fetchMonthlyInsight = useCallback(async () => {
-    if (!user?.id) return;
-    setIsInsightLoading(true);
-    const result = await invokeFinanceAction('monthly_insight', { budgetMonth: activeBudgetMonth });
-    if (!result.error && result.data) {
-      setMonthlyInsight(result.data);
-    }
-    setIsInsightLoading(false);
-  }, [invokeFinanceAction, user, activeBudgetMonth]);
-
-  // --- AI: Smart Categorize ---
-  const smartCategorize = useCallback(async (transactionName, transactionAmount) => {
-    if (!user?.id || !transactionName) return null;
-    setIsSmartLoading(true);
-    const result = await invokeFinanceAction('smart_categorize', { transactionName, transactionAmount });
-    setIsSmartLoading(false);
-    if (!result.error && result.data) {
-      setSmartSuggestion(result.data);
-      return result.data;
-    }
-    return null;
-  }, [invokeFinanceAction, user]);
-
-  const clearSmartSuggestion = useCallback(() => setSmartSuggestion(null), []);
-
-  return { error: data?.error || error?.message || 'Gagal memproses data keuangan.' };
+      return { error: data?.error || error?.message || 'Gagal memproses data keuangan.' };
     }
 
     return { data: data?.data };
@@ -307,7 +287,8 @@ export function useFinance(user, addToast, getStoredSessionProof) {
         total_income: nextSettings.total_income,
         accounts: nextSettings.accounts,
         categories: nextSettings.categories,
-        goals: nextSettings.goals
+        goals: nextSettings.goals,
+        cutoff_date: nextSettings.cutoff_date
       }
     });
 
@@ -320,7 +301,8 @@ export function useFinance(user, addToast, getStoredSessionProof) {
       total_income: baseTotalIncome,
       accounts,
       categories,
-      goals
+      goals,
+      cutoff_date: cutoffDate
     });
   };
 
@@ -521,6 +503,28 @@ export function useFinance(user, addToast, getStoredSessionProof) {
     return items;
   }, [budgetAlerts, unpaidCount, goals]);
 
+
+  // --- AI: Monthly Insight ---
+  const fetchMonthlyInsight = useCallback(async () => {
+    if (!user?.id) return;
+    setIsInsightLoading(true);
+    const result = await invokeFinanceAction('monthly_insight', { budgetMonth: activeBudgetMonth });
+    if (!result.error && result.data) { setMonthlyInsight(result.data); }
+    setIsInsightLoading(false);
+  }, [invokeFinanceAction, user, activeBudgetMonth]);
+
+  // --- AI: Smart Categorize ---
+  const smartCategorize = useCallback(async (transactionName, transactionAmount) => {
+    if (!user?.id || !transactionName) return null;
+    setIsSmartLoading(true);
+    const result = await invokeFinanceAction('smart_categorize', { transactionName, transactionAmount });
+    setIsSmartLoading(false);
+    if (!result.error && result.data) { setSmartSuggestion(result.data); return result.data; }
+    return null;
+  }, [invokeFinanceAction, user]);
+
+  const clearSmartSuggestion = useCallback(() => setSmartSuggestion(null), []);
+
   return {
     // State
     baseTotalIncome, setBaseTotalIncome,
@@ -549,7 +553,6 @@ export function useFinance(user, addToast, getStoredSessionProof) {
     budgetAlerts, unpaidCount, donutChartData, notifications,
     activeFilterCount, clearAllFilters,
     cutoffDate, setCutoffDate,
-
     // AI Features
     monthlyInsight, isInsightLoading, fetchMonthlyInsight,
     smartSuggestion, isSmartLoading, smartCategorize, clearSmartSuggestion,
