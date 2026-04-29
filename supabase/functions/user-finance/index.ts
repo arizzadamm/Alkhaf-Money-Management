@@ -22,19 +22,31 @@ const json = (body: unknown, status = 200) =>
   });
 
 const verifySession = async (requesterId: string, sessionProof: string) => {
-  const { data, error } = await supabaseAdmin
-    .from('app_users')
-    .select('id, username, role')
-    .eq('id', requesterId)
-    .eq('password', sessionProof)
+  const { data: session, error: sessionError } = await supabaseAdmin
+    .from('session_tokens')
+    .select('id, user_id, expires_at, is_revoked')
+    .eq('token', sessionProof)
+    .eq('user_id', requesterId)
+    .eq('is_revoked', false)
+    .gt('expires_at', new Date().toISOString())
     .maybeSingle();
 
-  if (error || !data) return { ok: false as const, message: 'Sesi tidak valid.' };
-  if ((data.role || '').toLowerCase() === 'admin') {
+  if (sessionError || !session) return { ok: false as const, message: 'Sesi tidak valid.' };
+
+  await supabaseAdmin.from('session_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', session.id);
+
+  const { data: user, error: userError } = await supabaseAdmin
+    .from('app_users')
+    .select('id, username, role')
+    .eq('id', session.user_id)
+    .single();
+
+  if (userError || !user) return { ok: false as const, message: 'User tidak ditemukan.' };
+  if ((user.role || '').toLowerCase() === 'admin') {
     return { ok: false as const, message: 'Akun admin tidak menggunakan endpoint finansial user.' };
   }
 
-  return { ok: true as const, user: data };
+  return { ok: true as const, user };
 };
 
 const getMonthRange = (budgetMonth: string) => {
@@ -60,7 +72,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, requesterId, sessionProof, budgetMonth, rows, transactionId, isPaid, settings } = body ?? {};
+    const { action, requesterId, sessionProof, budgetMonth, rows, transactionId, isPaid, settings, updates } = body ?? {};
 
     if (!action || !requesterId || !sessionProof) {
       return json({ error: 'Payload tidak lengkap.' }, 400);
@@ -201,6 +213,38 @@ Deno.serve(async (req) => {
       const { data, error } = await supabaseAdmin
         .from('expenses')
         .delete()
+        .eq('id', transactionId)
+        .eq('user_id', auth.user.id)
+        .select('*')
+        .maybeSingle();
+
+      if (error) return json({ error: error.message }, 400);
+      if (!data) return json({ error: 'Transaksi tidak ditemukan.' }, 404);
+      return json({ data });
+    }
+
+    if (action === 'update_transaction') {
+      if (!transactionId || !updates || typeof updates !== 'object') {
+        return json({ error: 'transactionId dan updates wajib diisi.' }, 400);
+      }
+
+      const allowedFields = ['name', 'amount', 'account', 'category', 'budget_month', 'is_paid', 'date'];
+      const sanitized: Record<string, unknown> = {};
+      for (const key of allowedFields) {
+        if ((updates as Record<string, unknown>)[key] !== undefined) {
+          if (key === 'amount') sanitized[key] = Number((updates as Record<string, unknown>)[key]) || 0;
+          else if (key === 'is_paid') sanitized[key] = Boolean((updates as Record<string, unknown>)[key]);
+          else sanitized[key] = String((updates as Record<string, unknown>)[key]).trim();
+        }
+      }
+
+      if (Object.keys(sanitized).length === 0) {
+        return json({ error: 'Tidak ada field valid untuk diupdate.' }, 400);
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('expenses')
+        .update(sanitized)
         .eq('id', transactionId)
         .eq('user_id', auth.user.id)
         .select('*')

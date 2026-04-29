@@ -24,15 +24,27 @@ const json = (body: unknown, status = 200) =>
 const normalizeRole = (role: string | null | undefined) => (role || '').toLowerCase();
 
 const verifySession = async (requesterId: string, sessionProof: string) => {
-  const { data, error } = await supabaseAdmin
-    .from('app_users')
-    .select('id, username, role')
-    .eq('id', requesterId)
-    .eq('password', sessionProof)
+  const { data: session, error: sessionError } = await supabaseAdmin
+    .from('session_tokens')
+    .select('id, user_id, expires_at, is_revoked')
+    .eq('token', sessionProof)
+    .eq('user_id', requesterId)
+    .eq('is_revoked', false)
+    .gt('expires_at', new Date().toISOString())
     .maybeSingle();
 
-  if (error || !data) return { ok: false as const, message: 'Sesi tidak valid.' };
-  return { ok: true as const, user: data };
+  if (sessionError || !session) return { ok: false as const, message: 'Sesi tidak valid.' };
+
+  await supabaseAdmin.from('session_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', session.id);
+
+  const { data: user, error: userError } = await supabaseAdmin
+    .from('app_users')
+    .select('id, username, role')
+    .eq('id', session.user_id)
+    .single();
+
+  if (userError || !user) return { ok: false as const, message: 'User tidak ditemukan.' };
+  return { ok: true as const, user };
 };
 
 const generateTokenCode = () => crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();

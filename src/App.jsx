@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun, Target, Eye, ChevronRight, Users } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun, Target, Eye, ChevronRight, Users, Pencil, AlertTriangle, Filter } from 'lucide-react';
 import { BarChart, Bar, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import QRCode from 'qrcode';
 import { supabase } from './supabaseClient';
@@ -120,6 +120,50 @@ const hashPassword = async (password) => {
 
 const CHART_COLORS = ['#d2f411', '#213f31', '#2d5866', '#94a3b8', '#cbd5e1', '#86efac', '#bbf7d0', '#e2e8f0'];
 
+const ToastItem = ({ toast, onDismiss }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => onDismiss(toast.id), toast.duration || 4000);
+    return () => clearTimeout(timer);
+  }, [toast.id, toast.duration, onDismiss]);
+
+  return (
+    <div className={`toast-item toast-${toast.type}`}>
+      <span className="toast-message">{toast.message}</span>
+      <div className="toast-actions">
+        {toast.action && (
+          <button className="toast-action-btn" onClick={() => { toast.action(); onDismiss(toast.id); }}>
+            {toast.actionLabel}
+          </button>
+        )}
+        <button className="toast-close-btn" onClick={() => onDismiss(toast.id)}>
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const FormattedNumberInput = ({ value, onChange, className = '', ...props }) => {
+  const formatDisplay = (num) => num ? Number(num).toLocaleString('id-ID') : '';
+  const [display, setDisplay] = useState(formatDisplay(value));
+
+  useEffect(() => { setDisplay(formatDisplay(value)); }, [value]);
+
+  const handleChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    const num = Number(raw) || 0;
+    setDisplay(num.toLocaleString('id-ID'));
+    onChange(num);
+  };
+
+  return (
+    <div className="formatted-input-wrapper">
+      <span className="formatted-input-prefix">Rp</span>
+      <input type="text" inputMode="numeric" value={display} onChange={handleChange} className={`form-input formatted-input-field ${className}`} {...props} />
+    </div>
+  );
+};
+
 function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
@@ -174,6 +218,39 @@ function App() {
   const [transactionGroupBy, setTransactionGroupBy] = useState('day');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const isAdmin = user?.role === 'admin';
+
+  // Toast system
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((message, type = 'info', options = {}) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const duration = options.duration || (type === 'undo' ? 8000 : 4000);
+    setToasts(prev => [...prev, { id, message, type, action: options.action, actionLabel: options.actionLabel || 'Undo', duration }]);
+    return id;
+  }, []);
+  const removeToast = useCallback((id) => { setToasts(prev => prev.filter(t => t.id !== id)); }, []);
+
+  // Edit transaction
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  // Change credentials
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState('');
+
+  // Undo delete
+  const pendingDeleteRef = useRef(null);
+
+  // Notifications
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [readNotifications, setReadNotifications] = useState(new Set());
+
+  // Filters
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterAccount, setFilterAccount] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
   
   const getReferenceDate = useMemo(() => {
     const d = new Date();
@@ -594,7 +671,7 @@ function App() {
     const budgetMonth = e.target.budget_month.value;
     const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    if (fromAcc === toAcc) return alert('Source and destination accounts must be different.');
+    if (fromAcc === toAcc) return addToast('Akun asal dan tujuan harus berbeda.', 'error');
     if (amount > 0) {
       setIsTransferOpen(false);
       await insertTransactions([
@@ -630,6 +707,52 @@ function App() {
 
     if (result.error) console.error('Failed to save settings:', result.error);
   };
+
+  // Edit transaction handler
+  const openEditTransaction = (tx) => { setEditingTransaction(tx); setIsEditOpen(true); };
+  const handleEditTransaction = async (e) => {
+    e.preventDefault();
+    if (!editingTransaction) return;
+    const name = e.target.name.value;
+    const amount = Number(String(e.target.amount.value).replace(/\D/g, '')) || Number(e.target.amount.value);
+    const account = e.target.account.value;
+    const category = e.target.category.value;
+    const budgetMonth = e.target.budget_month.value;
+    if (!name || !amount) return addToast('Nama dan jumlah wajib diisi.', 'error');
+    setIsEditOpen(false);
+    const result = await invokeFinanceAction('update_transaction', { transactionId: editingTransaction.id, updates: { name, amount, account, category, budget_month: budgetMonth } });
+    if (result.error) { addToast(result.error, 'error'); return; }
+    addToast('Transaksi berhasil diperbarui!', 'success');
+    await Promise.all([fetchTransactions(), fetchGlobalTransactions()]);
+    setEditingTransaction(null);
+  };
+
+  // Change credentials handler
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setChangePasswordError('');
+    const currentVal = e.target.currentPassword.value;
+    const newVal = e.target.newPassword.value;
+    const confirmVal = e.target.confirmPassword.value;
+    if (newVal.length < 6) { setChangePasswordError('Minimal 6 karakter.'); return; }
+    if (newVal !== confirmVal) { setChangePasswordError('Konfirmasi tidak cocok.'); return; }
+    const currentHash = await hashPassword(currentVal);
+    const newHash = await hashPassword(newVal);
+    const sessionProof = getStoredSessionProof();
+    try {
+      const { data, error } = await supabase.functions.invoke('auth-session', {
+        body: { action: 'change_password', requesterId: user.id, sessionToken: sessionProof, currentPasswordHash: currentHash, newPasswordHash: newHash }
+      });
+      if (error || data?.error) { setChangePasswordError(data?.error || error?.message || 'Gagal mengubah.'); return; }
+      if (data?.data?.sessionToken) storeSessionProof(data.data.sessionToken, rememberMe);
+      setIsChangePasswordOpen(false);
+      addToast('Kredensial berhasil diubah!', 'success');
+    } catch { setChangePasswordError('Terjadi kesalahan koneksi.'); }
+  };
+
+  // Clear filters helper
+  const activeFilterCount = [filterCategory, filterAccount, filterType, filterStatus].filter(Boolean).length;
+  const clearAllFilters = () => { setFilterCategory(''); setFilterAccount(''); setFilterType(''); setFilterStatus(''); };
 
   const saveSettings = async () => {
     setIsSettingsOpen(false);
@@ -761,7 +884,7 @@ function App() {
   };
 
   const exportToCSV = () => {
-    if (transactions.length === 0) return alert("Tidak ada transaksi untuk diekspor di bulan ini.");
+    if (transactions.length === 0) return addToast('Tidak ada transaksi untuk diekspor.', 'warning');
     const headers = ['ID', 'Date', 'Transaction Name', 'Amount (IDR)', 'Account', 'Category', 'Type', 'Status', 'Budget Month'];
     const csvRows = [headers.join(',')];
     transactions.forEach(tx => {
@@ -778,10 +901,27 @@ function App() {
   };
 
   const filteredTransactions = useMemo(() => {
-    if (!searchQuery.trim()) return transactions;
-    const lowerQ = searchQuery.toLowerCase();
-    return transactions.filter(t => t.name.toLowerCase().includes(lowerQ) || t.category.toLowerCase().includes(lowerQ) || t.account.toLowerCase().includes(lowerQ));
-  }, [transactions, searchQuery]);
+    let result = transactions;
+    if (searchQuery.trim()) {
+      const lowerQ = searchQuery.toLowerCase();
+      result = result.filter(t => t.name.toLowerCase().includes(lowerQ) || t.category.toLowerCase().includes(lowerQ) || t.account.toLowerCase().includes(lowerQ));
+    }
+    if (filterCategory) result = result.filter(t => t.category === filterCategory);
+    if (filterAccount) result = result.filter(t => t.account === filterAccount);
+    if (filterType === 'income') result = result.filter(t => t.category === 'Income' || t.category === 'Transfer In');
+    else if (filterType === 'expense') result = result.filter(t => t.category !== 'Income' && !t.category.includes('Transfer'));
+    else if (filterType === 'transfer') result = result.filter(t => t.category.includes('Transfer'));
+    if (filterStatus === 'paid') result = result.filter(t => t.isPaid);
+    else if (filterStatus === 'unpaid') result = result.filter(t => !t.isPaid);
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'amount') cmp = Number(a.amount) - Number(b.amount);
+      else if (sortBy === 'name') cmp = (a.name || '').localeCompare(b.name || '');
+      else cmp = new Date(a.created_at || a.date) - new Date(b.created_at || b.date);
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+    return result;
+  }, [transactions, searchQuery, filterCategory, filterAccount, filterType, filterStatus, sortBy, sortOrder]);
 
   const groupedTransactions = useMemo(() => {
     const groups = new Map();
@@ -1115,7 +1255,32 @@ function App() {
               <div className="profile-name">{user.name}</div>
               <div className="profile-role">{user.role}</div>
             </div>
-            <Bell size={18} color="var(--text-secondary)" style={{cursor:'pointer'}} />
+            <div style={{position:'relative'}}>
+              <div style={{cursor:'pointer',position:'relative'}} onClick={() => setIsNotificationOpen(!isNotificationOpen)}>
+                <Bell size={18} color="var(--text-secondary)" />
+                {notifications.filter(n => !readNotifications.has(n.id)).length > 0 && <span className="notification-badge">{notifications.filter(n => !readNotifications.has(n.id)).length}</span>}
+              </div>
+              {isNotificationOpen && (
+                <>
+                  <div className="notification-panel-overlay" onClick={() => setIsNotificationOpen(false)} />
+                  <div className="notification-panel">
+                    <div className="notification-panel-header">
+                      <h3>Notifikasi</h3>
+                      <button onClick={() => { setReadNotifications(new Set(notifications.map(n => n.id))); }}>Tandai semua dibaca</button>
+                    </div>
+                    {notifications.length === 0 ? <div className="notification-empty">Tidak ada notifikasi</div> : notifications.map(n => (
+                      <div key={n.id} className={`notification-item ${readNotifications.has(n.id) ? '' : 'unread'}`} onClick={() => setReadNotifications(prev => new Set([...prev, n.id]))}>
+                        <div className={`notification-icon ${n.type}`}><AlertTriangle size={18} /></div>
+                        <div className="notification-content">
+                          <div className="notification-title">{n.title}</div>
+                          <div className="notification-desc">{n.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           {!isAdmin && (
             <>
@@ -1393,6 +1558,33 @@ function App() {
                 </div>
               </div>
 
+              <div className="filter-bar">
+                <select className={`filter-select ${filterCategory ? 'active' : ''}`} value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+                  <option value="">Semua Kategori</option>
+                  {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  <option value="Income">Income</option>
+                </select>
+                <select className={`filter-select ${filterAccount ? 'active' : ''}`} value={filterAccount} onChange={e => setFilterAccount(e.target.value)}>
+                  <option value="">Semua Akun</option>
+                  {accounts.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                </select>
+                <select className={`filter-select ${filterType ? 'active' : ''}`} value={filterType} onChange={e => setFilterType(e.target.value)}>
+                  <option value="">Semua Tipe</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                  <option value="transfer">Transfer</option>
+                </select>
+                <select className={`filter-select ${filterStatus ? 'active' : ''}`} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                  <option value="">Semua Status</option>
+                  <option value="paid">Paid</option>
+                  <option value="unpaid">Unpaid</option>
+                </select>
+                <div className="sort-toggle">
+                  {['date','amount','name'].map(s => <button key={s} className={sortBy === s ? 'active' : ''} onClick={() => { setSortBy(s); setSortOrder(prev => sortBy === s ? (prev === 'desc' ? 'asc' : 'desc') : 'desc'); }}>{s === 'date' ? 'Tanggal' : s === 'amount' ? 'Nominal' : 'Nama'}{sortBy === s ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}</button>)}
+                </div>
+                {activeFilterCount > 0 && <button className="filter-clear-btn" onClick={clearAllFilters}><X size={14}/> Reset ({activeFilterCount})</button>}
+              </div>
+
               {groupedTransactions.length === 0 ? (
                 <div className="transactions-empty-state">Belum ada transaksi untuk filter ini.</div>
               ) : (
@@ -1422,7 +1614,7 @@ function App() {
                               <td>{tx.account}</td>
                               <td>{tx.category}</td>
                               <td style={{textAlign:'right', color: tx.category === 'Income' || tx.category === 'Transfer In' ? 'var(--success)' : 'inherit'}}>{formatIDR(tx.amount)}</td>
-                              <td style={{textAlign:'right'}}><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)'}} onClick={() => removeTransaction(tx.id)}><Trash2 size={18}/></button></td>
+                              <td style={{textAlign:'right'}}><div style={{display:'inline-flex', gap:'0.35rem'}}><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent-blue-gray)'}} onClick={() => openEditTransaction(tx)}><Pencil size={16}/></button><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)'}} onClick={() => removeTransaction(tx.id)}><Trash2 size={18}/></button></div></td>
                             </tr>
                           ))}
                         </tbody>
@@ -2122,6 +2314,109 @@ function App() {
       )}
 
       {!isAdmin && isSettingsOpen && renderSettingsModal()}
+
+      {/* Edit Transaction Modal */}
+      {isEditOpen && editingTransaction && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Edit Transaksi</h2>
+              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => { setIsEditOpen(false); setEditingTransaction(null); }}><X size={24}/></button>
+            </div>
+            <form onSubmit={handleEditTransaction}>
+              <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Budget Month</label>
+                <select name="budget_month" className="form-input" required defaultValue={editingTransaction.budget_month || activeBudgetMonth}>
+                  {timelineMonths.map(m => <option key={m.budgetMonthValue} value={m.budgetMonthValue}>{m.label} ({m.budgetMonthValue})</option>)}
+                </select>
+              </div>
+              <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Nama Transaksi</label>
+                <input type="text" name="name" className="form-input" defaultValue={editingTransaction.name} required />
+              </div>
+              <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Jumlah (IDR)</label>
+                <input type="number" name="amount" className="form-input" defaultValue={editingTransaction.amount} required />
+              </div>
+              <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Akun</label>
+                <select name="account" className="form-input" required defaultValue={editingTransaction.account}>
+                  {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
+                </select>
+              </div>
+              <div style={{marginBottom:'1.5rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Kategori</label>
+                <select name="category" className="form-input" required defaultValue={editingTransaction.category}>
+                  <option value="Income">Income</option>
+                  <option value="Transfer In">Transfer In</option>
+                  <option value="Transfer Out">Transfer Out</option>
+                  {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                </select>
+              </div>
+              <button type="submit" className="btn-primary" style={{width:'100%', color:'white'}}>Simpan Perubahan</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Credentials Modal */}
+      {isChangePasswordOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Ubah Kredensial</h2>
+              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsChangePasswordOpen(false)}><X size={24}/></button>
+            </div>
+            <form onSubmit={handleChangePassword}>
+              {changePasswordError && <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>{changePasswordError}</div>}
+              <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Kredensial Saat Ini</label>
+                <input type="password" name="currentPassword" className="form-input" required placeholder="Masukkan kredensial saat ini" />
+              </div>
+              <div style={{marginBottom:'1rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Kredensial Baru</label>
+                <input type="password" name="newPassword" className="form-input" required placeholder="Minimal 6 karakter" />
+              </div>
+              <div style={{marginBottom:'1.5rem'}}>
+                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Konfirmasi Kredensial Baru</label>
+                <input type="password" name="confirmPassword" className="form-input" required placeholder="Ulangi kredensial baru" />
+              </div>
+              <button type="submit" className="btn-primary" style={{width:'100%', color:'white'}}>Ubah Kredensial</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Notification Panel */}
+      {isMobile && isNotificationOpen && (
+        <>
+          <div className="notification-panel-overlay" onClick={() => setIsNotificationOpen(false)} />
+          <div className="notification-panel">
+            <div className="notification-panel-header">
+              <h3>Notifikasi</h3>
+              <button onClick={() => { setReadNotifications(new Set(notifications.map(n => n.id))); }}>Tandai semua dibaca</button>
+            </div>
+            {notifications.length === 0 ? <div className="notification-empty">Tidak ada notifikasi</div> : notifications.map(n => (
+              <div key={n.id} className={`notification-item ${readNotifications.has(n.id) ? '' : 'unread'}`} onClick={() => setReadNotifications(prev => new Set([...prev, n.id]))}>
+                <div className={`notification-icon ${n.type}`}><AlertTriangle size={18} /></div>
+                <div className="notification-content">
+                  <div className="notification-title">{n.title}</div>
+                  <div className="notification-desc">{n.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Toast Container */}
+      {toasts.length > 0 && (
+        <div className="toast-container">
+          {toasts.map(toast => (
+            <ToastItem key={toast.id} toast={toast} onDismiss={removeToast} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
