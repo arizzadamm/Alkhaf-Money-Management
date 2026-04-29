@@ -8,7 +8,7 @@ export const HomeView = ({
   isMobile,
   accounts, categories, goals,
   filteredTransactions,
-  totalBalance, currentAccountBalances,
+  totalBalance, monthlyBalance, displayBalance, displayBalanceLabel, showTotalBalance, setShowTotalBalance, currentAccountBalances,
   effectiveTotalIncome, totals, donutChartData,
   usagePercentage, timelineMonths, monthOffset, setMonthOffset,
   quickAddGoalFund,
@@ -20,9 +20,14 @@ export const HomeView = ({
     return (
       <>
         <div className="mobile-balance">
-          <div style={{color:'var(--text-secondary)', fontSize:'0.9rem', marginBottom:'0.25rem'}}>Total Balance</div>
+          <div style={{display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'0.25rem'}}>
+            <span style={{color:'var(--text-secondary)', fontSize:'0.9rem'}}>{displayBalanceLabel}</span>
+            <button onClick={() => setShowTotalBalance(!showTotalBalance)} style={{background:'none', border:'1px solid var(--border-color)', borderRadius:'999px', padding:'0.2rem 0.6rem', fontSize:'0.7rem', fontWeight:'600', color:'var(--text-secondary)', cursor:'pointer'}}>
+              {showTotalBalance ? 'Bulan Ini' : 'Total'}
+            </button>
+          </div>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-            <div style={{fontSize:'2.5rem', fontWeight:'800', color:'var(--text-primary)', letterSpacing:'-1px'}}>{formatIDR(totalBalance)}</div>
+            <div style={{fontSize:'2.5rem', fontWeight:'800', color:'var(--text-primary)', letterSpacing:'-1px'}}>{formatIDR(displayBalance)}</div>
             <Eye size={24} color="var(--text-secondary)"/>
           </div>
         </div>
@@ -129,10 +134,13 @@ export const HomeView = ({
           <h2 className="hero-card-title">Your Financial Flow</h2>
           <p className="hero-card-subtitle">Track income and expenses automatically from Telegram.</p>
         </div>
-        <div className="hero-card-metric">
-          <div className="hero-card-metric-label">Total Balance</div>
-          <div className="hero-card-metric-value">{formatIDR(totalBalance)}</div>
-          <div className="hero-card-metric-trend">+5.8% this month</div>
+        <div className="hero-card-metric" style={{cursor:'pointer'}} onClick={() => setShowTotalBalance(!showTotalBalance)}>
+          <div style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
+            <div className="hero-card-metric-label">{displayBalanceLabel}</div>
+            <span style={{background:'rgba(255,255,255,0.15)', borderRadius:'999px', padding:'0.15rem 0.5rem', fontSize:'0.7rem', fontWeight:'600'}}>{showTotalBalance ? 'Bulan Ini' : 'Total'}</span>
+          </div>
+          <div className="hero-card-metric-value">{formatIDR(displayBalance)}</div>
+          <div className="hero-card-metric-trend">{showTotalBalance ? 'Kumulatif semua bulan' : 'Income - Expense bulan ini'}</div>
         </div>
       </div>
 

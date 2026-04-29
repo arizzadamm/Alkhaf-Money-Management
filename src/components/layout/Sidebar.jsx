@@ -5,7 +5,7 @@ import { NotificationPanel } from '../NotificationPanel';
 
 export const Sidebar = ({
   user, isAdmin, activeView, setActiveView,
-  totalBalance, notifications, readNotifications, setReadNotifications,
+  totalBalance, monthlyBalance, displayBalance, displayBalanceLabel, showTotalBalance, setShowTotalBalance, notifications, readNotifications, setReadNotifications,
   handleLogout, fetchAdminUsers,
 }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -52,9 +52,12 @@ export const Sidebar = ({
         </div>
         {!isAdmin && (
           <>
-            <div className="total-balance">
-              <div className="total-balance-label">Total Balance</div>
-              <div className="total-balance-value">{formatIDR(totalBalance)}</div>
+            <div className="total-balance" style={{cursor:'pointer'}} onClick={() => setShowTotalBalance(!showTotalBalance)}>
+              <div style={{display:'flex', alignItems:'center', gap:'0.4rem'}}>
+                <div className="total-balance-label">{displayBalanceLabel}</div>
+                <span style={{background:'var(--hover-bg)', borderRadius:'999px', padding:'0.1rem 0.45rem', fontSize:'0.65rem', fontWeight:'600', color:'var(--text-secondary)'}}>{showTotalBalance ? 'Bulan Ini' : 'Total'}</span>
+              </div>
+              <div className="total-balance-value">{formatIDR(displayBalance)}</div>
             </div>
             <button className="btn-lime"><QrCode size={20} /> Scan QR</button>
           </>

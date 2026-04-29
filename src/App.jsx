@@ -198,6 +198,11 @@ function App() {
     transactionChartData: finance.transactionChartData,
     transactionPeriodSummary: finance.transactionPeriodSummary,
     totalBalance: finance.totalBalance,
+    monthlyBalance: finance.monthlyBalance,
+    displayBalance: finance.displayBalance,
+    displayBalanceLabel: finance.displayBalanceLabel,
+    showTotalBalance: finance.showTotalBalance,
+    setShowTotalBalance: finance.setShowTotalBalance,
     currentAccountBalances: finance.currentAccountBalances,
     effectiveTotalIncome: finance.effectiveTotalIncome,
     totals: finance.totals,
@@ -278,7 +283,7 @@ function App() {
         <>
           <Sidebar
             user={auth.user} isAdmin={auth.isAdmin} activeView={activeView} setActiveView={setActiveView}
-            totalBalance={finance.totalBalance} notifications={finance.notifications}
+            totalBalance={finance.totalBalance} monthlyBalance={finance.monthlyBalance} displayBalance={finance.displayBalance} displayBalanceLabel={finance.displayBalanceLabel} showTotalBalance={finance.showTotalBalance} setShowTotalBalance={finance.setShowTotalBalance} notifications={finance.notifications}
             readNotifications={readNotifications} setReadNotifications={setReadNotifications}
             handleLogout={handleLogout} fetchAdminUsers={admin.fetchAdminUsers}
           />

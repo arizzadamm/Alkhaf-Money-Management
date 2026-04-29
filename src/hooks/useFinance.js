@@ -27,6 +27,9 @@ export function useFinance(user, addToast, getStoredSessionProof) {
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
 
+  // Balance view toggle (monthly vs total)
+  const [showTotalBalance, setShowTotalBalance] = useState(false);
+
   // Undo delete
   const pendingDeleteRef = useRef(null);
 
@@ -435,6 +438,21 @@ export function useFinance(user, addToast, getStoredSessionProof) {
   const usagePercentage = effectiveTotalIncome > 0 ? ((totals.allocated / effectiveTotalIncome) * 100).toFixed(1) : 0;
   const totalBalance = Object.values(currentAccountBalances).reduce((a, b) => a + b, 0);
 
+  // Monthly balance: income - expenses for current viewed month only
+  const monthlyBalance = useMemo(() => {
+    const monthIncome = transactions
+      .filter(t => t.category === 'Income' || t.category === 'Transfer In')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    const monthExpense = transactions
+      .filter(t => t.category !== 'Income' && !t.category.includes('Transfer') && t.isPaid)
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    return monthIncome - monthExpense;
+  }, [transactions]);
+
+  // The displayed balance based on toggle
+  const displayBalance = showTotalBalance ? totalBalance : monthlyBalance;
+  const displayBalanceLabel = showTotalBalance ? 'Total Balance' : 'Balance Bulan Ini';
+
   const budgetAlerts = useMemo(() => {
     return categories.map(cat => {
       const spent = totals.categoryTotals[cat.name] || 0;
@@ -491,7 +509,7 @@ export function useFinance(user, addToast, getStoredSessionProof) {
     getReferenceDate, viewMonthName, activeBudgetMonth, timelineMonths,
     filteredTransactions, groupedTransactions, transactionChartData, transactionPeriodSummary,
     totals, effectiveTotalIncome, currentAccountBalances,
-    sumOfAccounts, sumOfCategories, usagePercentage, totalBalance,
+    sumOfAccounts, sumOfCategories, usagePercentage, totalBalance, monthlyBalance, displayBalance, displayBalanceLabel, showTotalBalance, setShowTotalBalance,
     budgetAlerts, unpaidCount, donutChartData, notifications,
     activeFilterCount, clearAllFilters,
 
