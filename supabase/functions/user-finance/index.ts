@@ -100,7 +100,8 @@ Deno.serve(async (req) => {
         total_income: Number(settings.total_income) || 0,
         accounts: Array.isArray(settings.accounts) ? settings.accounts : [],
         categories: Array.isArray(settings.categories) ? settings.categories : [],
-        goals: Array.isArray(settings.goals) ? settings.goals : []
+        goals: Array.isArray(settings.goals) ? settings.goals : [],
+        cutoff_date: Math.max(1, Math.min(28, Number(settings.cutoff_date) || 1))
       };
 
       const { data, error } = await supabaseAdmin

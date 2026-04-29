@@ -25,6 +25,11 @@ export const AdminView = ({
               <option value="admin">Admin</option>
             </select>
             <button type="submit" className="btn-primary" style={{color:'#fff'}}>{editingAdminUserId ? 'Update User' : 'Create User'}</button>
+            {editingAdminUserId && (
+              <button type="button" className="btn-danger" onClick={cancelEditAdminUser} style={{width:'100%', justifyContent:'center', padding:'0.75rem'}}>
+                Cancel Edit
+              </button>
+            )}
           </form>
         </div>
         <div className="widget-card">

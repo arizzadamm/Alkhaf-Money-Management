@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Trash2, QrCode } from 'lucide-react';
+import { LogOut, Trash2, QrCode, KeyRound } from 'lucide-react';
 
 export const TelegramProfilePanel = ({
   telegramConnections, telegramLinkToken, telegramError, telegramSuccess,
@@ -121,13 +121,25 @@ export const TelegramProfilePanel = ({
   </div>
 );
 
-export const ProfileView = ({ isMobile, user, handleLogout, telegramProps }) => {
+export const ProfileView = ({ isMobile, user, handleLogout, telegramProps, onChangePassword }) => {
   return (
-    <div style={{display:'flex', flexDirection:'column', gap: isMobile ? '1rem' : '1.5rem', maxWidth: isMobile ? undefined : '860px', margin: isMobile ? undefined : '0 auto', paddingBottom: isMobile ? '2rem' : undefined}}>
-      <div className="widget-card" style={{textAlign:'center', padding: isMobile ? undefined : '3rem'}}>
+    <div style={{display:'flex', flexDirection:'column', gap: isMobile ? '1rem' : '1.5rem', maxWidth: isMobile ? undefined : '860px', margin: isMobile ? undefined : '0 auto', paddingBottom: isMobile ? '6rem' : undefined}}>
+      <div className="widget-card" style={{textAlign:'center', padding: isMobile ? '1.5rem' : '3rem'}}>
+        <div style={{width:'72px', height:'72px', borderRadius:'50%', background:'var(--accent-lime)', color:'#0f172a', display:'grid', placeContent:'center', fontWeight:'800', fontSize:'1.8rem', margin:'0 auto 1rem'}}>
+          {user.name ? user.name.charAt(0).toUpperCase() : '?'}
+        </div>
         <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
         <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
-        <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
+        <div style={{display:'flex', gap:'0.75rem', justifyContent:'center', marginTop:'2rem', flexWrap:'wrap'}}>
+          {onChangePassword && (
+            <button className="btn-primary" onClick={onChangePassword} style={{color:'white', background:'var(--accent-blue-gray)'}}>
+              <KeyRound size={18}/> Ubah Password
+            </button>
+          )}
+          <button className="btn-danger" onClick={handleLogout} style={{padding:'0.75rem 1.5rem'}}>
+            <LogOut size={18}/> Logout
+          </button>
+        </div>
       </div>
       <TelegramProfilePanel {...telegramProps} />
     </div>

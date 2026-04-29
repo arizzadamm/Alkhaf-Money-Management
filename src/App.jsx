@@ -229,6 +229,10 @@ function App() {
     setIsSettingsOpen, setSettingsTab,
     setActiveView,
     exportToCSV,
+    // AI Features
+    monthlyInsight: finance.monthlyInsight,
+    isInsightLoading: finance.isInsightLoading,
+    fetchMonthlyInsight: finance.fetchMonthlyInsight,
   };
 
   const renderActiveView = () => {
@@ -259,6 +263,7 @@ function App() {
           user={auth.user}
           handleLogout={handleLogout}
           telegramProps={telegram}
+          onChangePassword={() => auth.setIsChangePasswordOpen(true)}
         />
       );
       default: return null;
@@ -270,13 +275,13 @@ function App() {
       {isMobile ? (
         <>
           <main className="main-content">
-            <MobileHeader user={auth.user} isAdmin={auth.isAdmin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} setIsNotificationOpen={setIsNotificationOpen} />
+            <MobileHeader user={auth.user} isAdmin={auth.isAdmin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} setIsNotificationOpen={setIsNotificationOpen} searchQuery={finance.searchQuery} setSearchQuery={finance.setSearchQuery} setActiveView={setActiveView} />
             {renderActiveView()}
           </main>
           <MobileBottomNav
             isAdmin={auth.isAdmin} activeView={activeView} setActiveView={setActiveView}
             handleLogout={handleLogout} fetchAdminUsers={admin.fetchAdminUsers}
-            setIsTopUpOpen={setIsTopUpOpen} setIsSettingsOpen={setIsSettingsOpen}
+            setIsAddOpen={setIsAddOpen} setIsSettingsOpen={setIsSettingsOpen}
           />
         </>
       ) : (
@@ -286,6 +291,7 @@ function App() {
             totalBalance={finance.totalBalance} monthlyBalance={finance.monthlyBalance} displayBalance={finance.displayBalance} displayBalanceLabel={finance.displayBalanceLabel} showTotalBalance={finance.showTotalBalance} setShowTotalBalance={finance.setShowTotalBalance} notifications={finance.notifications}
             readNotifications={readNotifications} setReadNotifications={setReadNotifications}
             handleLogout={handleLogout} fetchAdminUsers={admin.fetchAdminUsers}
+            setIsAddOpen={setIsAddOpen}
           />
           <main className="main-content">
             <TopBar
@@ -300,7 +306,15 @@ function App() {
 
       {/* Modals */}
       {!auth.isAdmin && isAddOpen && (
-        <AddExpenseModal accounts={finance.accounts} categories={finance.categories} timelineMonths={finance.timelineMonths} activeBudgetMonth={finance.activeBudgetMonth} onSubmit={handleAddExpense} onClose={() => setIsAddOpen(false)} />
+        <AddExpenseModal
+          accounts={finance.accounts} categories={finance.categories}
+          timelineMonths={finance.timelineMonths} activeBudgetMonth={finance.activeBudgetMonth}
+          onSubmit={handleAddExpense} onClose={() => setIsAddOpen(false)}
+          smartCategorize={finance.smartCategorize}
+          smartSuggestion={finance.smartSuggestion}
+          isSmartLoading={finance.isSmartLoading}
+          clearSmartSuggestion={finance.clearSmartSuggestion}
+        />
       )}
       {!auth.isAdmin && isTopUpOpen && (
         <TopUpModal accounts={finance.accounts} timelineMonths={finance.timelineMonths} activeBudgetMonth={finance.activeBudgetMonth} onSubmit={handleAddTopUp} onClose={() => setIsTopUpOpen(false)} />
@@ -316,6 +330,7 @@ function App() {
           categories={finance.categories} setCategories={finance.setCategories}
           goals={finance.goals} setGoals={finance.setGoals}
           sumOfAccounts={finance.sumOfAccounts} sumOfCategories={finance.sumOfCategories}
+          cutoffDate={finance.cutoffDate} setCutoffDate={finance.setCutoffDate}
           onSave={() => finance.saveSettings(() => setIsSettingsOpen(false))}
           onClose={() => setIsSettingsOpen(false)}
         />
@@ -350,4 +365,7 @@ function App() {
 }
 
 export default App;
+
+
+
 

@@ -10,6 +10,7 @@ export const SettingsModal = ({
   categories, setCategories,
   goals, setGoals,
   sumOfAccounts, sumOfCategories,
+  cutoffDate, setCutoffDate,
   onSave, onClose
 }) => {
   return (

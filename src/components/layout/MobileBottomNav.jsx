@@ -1,10 +1,10 @@
 import React from 'react';
-import { Home, CreditCard, User, ArrowRightLeft, Settings, Users, LogOut, QrCode } from 'lucide-react';
+import { Home, CreditCard, User, ArrowRightLeft, Settings, Users, LogOut, Plus } from 'lucide-react';
 
 export const MobileBottomNav = ({
   isAdmin, activeView, setActiveView,
   handleLogout, fetchAdminUsers,
-  setIsTopUpOpen, setIsSettingsOpen,
+  setIsAddOpen, setIsSettingsOpen,
 }) => {
   return (
     <div className="mobile-bottom-nav">
@@ -29,8 +29,8 @@ export const MobileBottomNav = ({
             <ArrowRightLeft size={24} /> <span>Trans</span>
           </div>
 
-          <div className="mobile-nav-fab" onClick={() => setIsTopUpOpen(true)}>
-             <QrCode size={26} color="#0f172a" />
+          <div className="mobile-nav-fab" onClick={() => setIsAddOpen(true)}>
+             <Plus size={26} color="#0f172a" />
           </div>
 
           <div className={`mobile-nav-item`} onClick={() => setIsSettingsOpen(true)}>

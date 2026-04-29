@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, CreditCard, User, Bell, Users, LogOut, QrCode } from 'lucide-react';
+import { Home, CreditCard, User, Bell, Users, LogOut, Plus } from 'lucide-react';
 import { formatIDR, getInitial } from '../../utils/formatters';
 import { NotificationPanel } from '../NotificationPanel';
 
@@ -7,6 +7,7 @@ export const Sidebar = ({
   user, isAdmin, activeView, setActiveView,
   totalBalance, monthlyBalance, displayBalance, displayBalanceLabel, showTotalBalance, setShowTotalBalance, notifications, readNotifications, setReadNotifications,
   handleLogout, fetchAdminUsers,
+  setIsAddOpen,
 }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
@@ -59,7 +60,7 @@ export const Sidebar = ({
               </div>
               <div className="total-balance-value">{formatIDR(displayBalance)}</div>
             </div>
-            <button className="btn-lime"><QrCode size={20} /> Scan QR</button>
+            <button className="btn-lime" onClick={() => setIsAddOpen(true)}><Plus size={20} /> Quick Add</button>
           </>
         )}
         {isAdmin && <button className="btn-danger" onClick={handleLogout}><LogOut size={18}/> Logout</button>}

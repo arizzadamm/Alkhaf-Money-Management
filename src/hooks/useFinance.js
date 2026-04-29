@@ -79,7 +79,33 @@ export function useFinance(user, addToast, getStoredSessionProof) {
     });
 
     if (error || data?.error) {
-      return { error: data?.error || error?.message || 'Gagal memproses data keuangan.' };
+      // --- AI: Monthly Insight ---
+  const fetchMonthlyInsight = useCallback(async () => {
+    if (!user?.id) return;
+    setIsInsightLoading(true);
+    const result = await invokeFinanceAction('monthly_insight', { budgetMonth: activeBudgetMonth });
+    if (!result.error && result.data) {
+      setMonthlyInsight(result.data);
+    }
+    setIsInsightLoading(false);
+  }, [invokeFinanceAction, user, activeBudgetMonth]);
+
+  // --- AI: Smart Categorize ---
+  const smartCategorize = useCallback(async (transactionName, transactionAmount) => {
+    if (!user?.id || !transactionName) return null;
+    setIsSmartLoading(true);
+    const result = await invokeFinanceAction('smart_categorize', { transactionName, transactionAmount });
+    setIsSmartLoading(false);
+    if (!result.error && result.data) {
+      setSmartSuggestion(result.data);
+      return result.data;
+    }
+    return null;
+  }, [invokeFinanceAction, user]);
+
+  const clearSmartSuggestion = useCallback(() => setSmartSuggestion(null), []);
+
+  return { error: data?.error || error?.message || 'Gagal memproses data keuangan.' };
     }
 
     return { data: data?.data };
@@ -100,6 +126,7 @@ export function useFinance(user, addToast, getStoredSessionProof) {
       setAccounts(data.accounts || []);
       setCategories(data.categories || []);
       setGoals(data.goals || []);
+      setCutoffDate(Number(data.cutoff_date) || 1);
     } else {
       setBaseTotalIncome(0);
       setAccounts([]);
@@ -512,6 +539,11 @@ export function useFinance(user, addToast, getStoredSessionProof) {
     sumOfAccounts, sumOfCategories, usagePercentage, totalBalance, monthlyBalance, displayBalance, displayBalanceLabel, showTotalBalance, setShowTotalBalance,
     budgetAlerts, unpaidCount, donutChartData, notifications,
     activeFilterCount, clearAllFilters,
+    cutoffDate, setCutoffDate,
+
+    // AI Features
+    monthlyInsight, isInsightLoading, fetchMonthlyInsight,
+    smartSuggestion, isSmartLoading, smartCategorize, clearSmartSuggestion,
 
     // Actions
     fetchSettings, fetchTransactions, fetchGlobalTransactions,

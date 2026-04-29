@@ -643,6 +643,31 @@
   .mobile-bell { background: var(--bg-card); border: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-content: center; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
   .notification-dot { position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; background: var(--danger); border-radius: 50%; border: 2px solid var(--bg-card); }
 
+  /* Mobile Search Bar */
+  .mobile-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0.6rem 1rem;
+    animation: fadeIn 200ms ease;
+  }
+  .mobile-search-bar input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .mobile-search-bar input::placeholder {
+    color: var(--text-secondary);
+  }
+
   /* Mobile Balance */
   .mobile-balance { display: block; margin-bottom: 1.5rem; }
 
@@ -1294,4 +1319,362 @@
   }
   .filter-bar::-webkit-scrollbar { display: none; }
   .filter-select { font-size: 0.8rem; padding: 0.5rem 0.75rem; padding-right: 1.8rem; }
+
+  /* ========================================= */
+  /* MOBILE TRANSACTIONS - ENHANCED            */
+  /* ========================================= */
+
+  /* Cashflow Summary Card */
+  .mobile-cashflow-card {
+    background: var(--bg-card);
+    border-radius: 20px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  }
+  .mobile-cashflow-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    margin-bottom: 0.85rem;
+    color: var(--text-secondary);
+  }
+  .mobile-cashflow-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+  }
+  .mobile-cashflow-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  .mobile-cashflow-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    background: var(--hover-bg);
+    border-radius: 14px;
+  }
+  .mobile-cashflow-stat-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .mobile-cashflow-stat-icon.income {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+  }
+  .mobile-cashflow-stat-icon.expense {
+    background: var(--danger-light);
+    color: var(--danger);
+  }
+  .mobile-cashflow-stat-icon.net {
+    background: rgba(45, 88, 102, 0.12);
+    color: var(--accent-blue-gray);
+  }
+  .mobile-cashflow-stat-label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .mobile-cashflow-stat strong {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .mobile-cashflow-stat strong.income { color: var(--success); }
+  .mobile-cashflow-stat strong.expense { color: var(--danger); }
+  .mobile-cashflow-chart {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.75rem;
+    animation: fadeIn 300ms ease;
+  }
+
+  /* Toolbar Row: Period Toggle + Filter Button */
+  .mobile-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .mobile-period-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-input);
+    flex: 1;
+  }
+  .mobile-period-toggle button {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.5rem 0.75rem;
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+    flex: 1;
+    text-align: center;
+  }
+  .mobile-period-toggle button.active {
+    background: var(--surface);
+    color: var(--text-primary);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+  }
+  .mobile-filter-toggle-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .mobile-filter-toggle-btn.has-filters {
+    border-color: var(--accent-dark-green);
+    color: var(--accent-dark-green);
+    background: rgba(33, 63, 49, 0.06);
+  }
+  .mobile-filter-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    background: var(--danger);
+    color: white;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    padding: 0 4px;
+    border: 2px solid var(--bg-card);
+  }
+
+  /* Filter Panel */
+  .mobile-filter-panel {
+    background: var(--bg-card);
+    border-radius: 20px;
+    padding: 1rem;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+    animation: fadeIn 200ms ease;
+  }
+  .mobile-filter-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .mobile-filter-item label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .mobile-filter-item .filter-select {
+    width: 100%;
+    font-size: 0.82rem;
+    border-radius: 12px;
+    padding: 0.6rem 0.75rem;
+    padding-right: 1.8rem;
+  }
+  .mobile-sort-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border-color);
+  }
+  .mobile-sort-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .mobile-sort-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-input);
+    flex: 1;
+  }
+  .mobile-sort-toggle button {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.4rem 0.6rem;
+    font-weight: 600;
+    font-size: 0.75rem;
+    cursor: pointer;
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .mobile-sort-toggle button.active {
+    background: var(--surface);
+    color: var(--text-primary);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+  }
+  .mobile-filter-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.6rem;
+    background: var(--danger-light);
+    color: var(--danger);
+    border: none;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Grouped Transactions */
+  .mobile-transaction-group {
+    background: var(--bg-card);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  }
+  .mobile-transaction-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: var(--hover-bg);
+    cursor: pointer;
+  }
+  .mobile-group-header-left h3 {
+    font-size: 0.88rem;
+    font-weight: 800;
+    margin-bottom: 0.15rem;
+  }
+  .mobile-group-header-left span {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+  .mobile-group-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+  }
+  .mobile-group-totals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .mobile-group-totals .income { color: var(--success); }
+  .mobile-group-totals .expense { color: var(--danger); }
+  .mobile-transaction-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .mobile-transaction-group-items .mobile-transaction-card {
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .mobile-transaction-group-items .mobile-transaction-card:last-child {
+    border-bottom: none;
+  }
+
+  /* Transaction Actions Row (Edit + Delete) */
+  .mobile-transaction-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  /* Period Breakdown Card */
+  .mobile-breakdown-card {
+    background: var(--bg-card);
+    border-radius: 20px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  }
+  .mobile-breakdown-header {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+  .mobile-breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .mobile-breakdown-item {
+    display: grid;
+    gap: 0.4rem;
+  }
+  .mobile-breakdown-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mobile-breakdown-item-header strong {
+    font-size: 0.85rem;
+  }
+  .mobile-breakdown-item-header span {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+  .mobile-breakdown-bar {
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--bg-input);
+  }
+  .mobile-breakdown-bar span {
+    display: block;
+    height: 100%;
+    min-width: 4px;
+    border-radius: inherit;
+    background: var(--danger);
+  }
+  .mobile-breakdown-item small {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 }

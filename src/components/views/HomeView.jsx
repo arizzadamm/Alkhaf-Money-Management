@@ -3,6 +3,7 @@ import { Plus, ArrowDownRight, ArrowUpRight, ArrowRightLeft, Download, CheckCirc
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { formatIDR, getInitial } from '../../utils/formatters';
 import { CHART_COLORS } from '../../utils/constants';
+import { InsightCard } from '../ui/InsightCard';
 
 export const HomeView = ({
   isMobile,
@@ -15,6 +16,7 @@ export const HomeView = ({
   setIsAddOpen, setIsTopUpOpen, setIsTransferOpen,
   setIsSettingsOpen, setSettingsTab,
   setActiveView, exportToCSV,
+  monthlyInsight, isInsightLoading, fetchMonthlyInsight, viewMonthName,
 }) => {
   if (isMobile) {
     return (
@@ -28,16 +30,16 @@ export const HomeView = ({
           </div>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
             <div style={{fontSize:'2.5rem', fontWeight:'800', color:'var(--text-primary)', letterSpacing:'-1px'}}>{formatIDR(displayBalance)}</div>
-            <Eye size={24} color="var(--text-secondary)"/>
           </div>
         </div>
 
+        {/* Bank Cards — show real account name & balance */}
         <div className="cards-container" style={{margin:'1rem 0 2rem 0'}}>
           {accounts.map((acc, index) => (
             <div key={acc.id} className={`bank-card color-${index % 4}`}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                <span className="bank-card-type">Debit</span>
-                <span style={{fontWeight:'800', fontSize:'1.2rem', letterSpacing:'1px'}}>VISA</span>
+                <span className="bank-card-type">{acc.name}</span>
+                <span style={{fontWeight:'700', fontStyle:'italic', fontSize:'0.9rem'}}>BANK</span>
               </div>
               <div className="chip-icon" style={{margin:'1.5rem 0'}}>
                 <div className="dots-row"><span></span><span></span></div>
@@ -45,12 +47,8 @@ export const HomeView = ({
               </div>
               <div className="bank-card-bottom" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
                 <div>
-                  <div style={{fontSize:'0.65rem', opacity:0.8, marginBottom:'0.2rem'}}>Card Number</div>
-                  <div className="bank-card-number">**** **** **** {String(acc.balance).substring(0,4)}</div>
-                </div>
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:'0.65rem', opacity:0.8, marginBottom:'0.2rem'}}>Valid</div>
-                  <div style={{fontSize:'0.9rem', fontWeight:'600'}}>07/30</div>
+                  <div style={{fontSize:'0.65rem', opacity:0.8, marginBottom:'0.2rem'}}>Balance</div>
+                  <div className="bank-card-number">{formatIDR(currentAccountBalances[acc.name])}</div>
                 </div>
               </div>
             </div>
@@ -59,22 +57,24 @@ export const HomeView = ({
 
         <div className="dashboard-grid">
           <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
+            {/* Quick Actions — fixed icons & labels */}
             <div className="mobile-actions-row">
               <div className="mobile-action-item" onClick={() => setIsTopUpOpen(true)}>
-                <div className="mobile-action-squircle"><Download size={24} color="var(--text-primary)"/></div><span>Top Up</span>
+                <div className="mobile-action-squircle"><ArrowUpRight size={24} color="var(--success)"/></div><span>Top Up</span>
               </div>
               <div className="mobile-action-item" onClick={() => setIsAddOpen(true)}>
-                <div className="mobile-action-squircle"><ArrowUpRight size={24} color="var(--text-primary)"/></div><span>Send</span>
+                <div className="mobile-action-squircle"><Plus size={24} color="var(--accent-dark-green)"/></div><span>Expense</span>
               </div>
               <div className="mobile-action-item" onClick={() => setIsTransferOpen(true)}>
-                <div className="mobile-action-squircle"><CreditCard size={24} color="var(--text-primary)"/></div><span>Pay</span>
+                <div className="mobile-action-squircle"><ArrowRightLeft size={24} color="var(--accent-blue-gray)"/></div><span>Transfer</span>
               </div>
               <div className="mobile-action-item" onClick={exportToCSV}>
-                <div className="mobile-action-squircle"><ArrowRightLeft size={24} color="var(--text-primary)"/></div><span>Transfer</span>
+                <div className="mobile-action-squircle"><Download size={24} color="var(--text-primary)"/></div><span>Export</span>
               </div>
             </div>
 
-            <div className="promo-banner">
+            {/* Promo Banner — navigates to Profile/Telegram */}
+            <div className="promo-banner" onClick={() => setActiveView('profile')} style={{cursor:'pointer'}}>
               <div className="promo-icon"><CreditCard size={20} color="white"/></div>
               <div>
                 <div className="promo-title">Telegram Auto Tracking</div>
@@ -83,6 +83,7 @@ export const HomeView = ({
               <div className="promo-arrow"><ChevronRight size={20}/></div>
             </div>
 
+            {/* Timeline */}
             <div style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'1.5rem', color:'white', marginTop:'1rem'}}>
                <h3 style={{fontSize:'1.2rem', fontWeight:'500', marginBottom:'1rem'}}>Timeline ({usagePercentage}%)</h3>
                <div style={{display:'flex', gap:'1rem', overflowX:'auto'}}>
@@ -98,26 +99,132 @@ export const HomeView = ({
                </div>
             </div>
 
-            <div className="transaction-list" style={{marginTop:'1rem'}}>
+            {/* Donut Chart — Total Allocated */}
+            <div className="widget-card" style={{padding:'1.25rem'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.5rem'}}>
+                <span style={{fontWeight:'700', fontSize:'0.95rem'}}>Total Allocated</span>
+                <div style={{background:'var(--danger-light)', padding:'0.4rem', borderRadius:'50%'}}><ArrowDownRight size={14} color="var(--danger)"/></div>
+              </div>
+              {donutChartData.length > 0 ? (
+                <div style={{ height: '160px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={donutChartData} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={5} dataKey="value" stroke="none">
+                        {donutChartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                      </Pie>
+                      <RechartsTooltip formatter={(value) => formatIDR(value)} contentStyle={{ borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', fontSize:'0.8rem' }}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (<div style={{ height: '100px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-secondary)', fontSize:'0.85rem' }}>No spending yet</div>)}
+              <div style={{textAlign:'center', fontWeight:'800', fontSize:'1.5rem', letterSpacing:'-0.03em'}}>{formatIDR(totals.allocated)}</div>
+              <div style={{textAlign:'center', fontSize:'0.8rem', color:'var(--text-secondary)'}}>{usagePercentage}% of Pool</div>
+            </div>
+
+            {/* Budget Categories */}
+            <div className="widget-card" style={{padding:'1.25rem'}}>
+              <div style={{fontWeight:'700', fontSize:'0.95rem', marginBottom:'1rem'}}>Budget Categories</div>
+              <div style={{display:'flex', flexDirection:'column', gap:'0.85rem'}}>
+                {categories.length === 0 && <span style={{color:'var(--text-secondary)', fontSize:'0.85rem'}}>No categories yet.</span>}
+                {categories.map((cat, i) => {
+                  const amount = totals.categoryTotals[cat.name] || 0;
+                  const targetAmount = (cat.targetPercentage / 100) * effectiveTotalIncome;
+                  const percent = targetAmount > 0 ? (amount / targetAmount) * 100 : 0;
+                  return (
+                    <div key={cat.id} style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
+                      <div style={{width:'34px', height:'34px', borderRadius:'50%', background:CHART_COLORS[i % CHART_COLORS.length], color: i===0?'black':'white', display:'grid', placeContent:'center', fontWeight:'600', fontSize:'0.8rem', flexShrink:0}}>
+                        {getInitial(cat.name)}
+                      </div>
+                      <div style={{flex:1, minWidth:0}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.82rem', marginBottom:'0.2rem'}}>
+                          <span style={{fontWeight:'500'}}>{cat.name} ({cat.targetPercentage}%)</span>
+                          <span style={{fontWeight:'600'}}>{formatIDR(amount)}</span>
+                        </div>
+                        <div style={{height:'5px', background:'var(--bg-input)', borderRadius:'3px', overflow:'hidden'}}>
+                          <div style={{height:'100%', width:`${Math.min(percent, 100)}%`, background:CHART_COLORS[i % CHART_COLORS.length]}}></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Savings Goals */}
+            <div className="widget-card" style={{padding:'1.25rem'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
+                <span style={{fontWeight:'700', fontSize:'0.95rem'}}>Savings Goals</span>
+                <button onClick={() => { setIsSettingsOpen(true); setSettingsTab('goals'); }} style={{background:'none', border:'none', color:'var(--accent-blue-gray)', fontSize:'0.8rem', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.25rem'}}><Plus size={14}/> Add</button>
+              </div>
+              <div style={{display:'flex', flexDirection:'column', gap:'1.25rem'}}>
+                {goals.length === 0 ? (<span style={{color:'var(--text-secondary)', fontSize:'0.85rem'}}>No savings goals yet.</span>) : (
+                  goals.map((goal, i) => {
+                    const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
+                    const isComplete = percent >= 100;
+                    return (
+                      <div key={goal.id}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'0.4rem'}}>
+                          <div style={{display:'flex', alignItems:'center', gap:'0.6rem'}}>
+                            <div style={{width:'32px', height:'32px', borderRadius:'8px', background: isComplete ? 'var(--success)' : 'var(--bg-input)', display:'grid', placeContent:'center', color: isComplete ? 'white' : CHART_COLORS[i % CHART_COLORS.length], flexShrink:0}}>
+                              {isComplete ? <CheckCircle2 size={16}/> : <Target size={16}/>}
+                            </div>
+                            <div>
+                              <div style={{fontWeight:'600', fontSize:'0.88rem'}}>{goal.name}</div>
+                              <div style={{fontSize:'0.7rem', color:'var(--text-secondary)'}}>{formatIDR(goal.currentAmount)} / {formatIDR(goal.targetAmount)}</div>
+                            </div>
+                          </div>
+                          <div style={{textAlign:'right'}}>
+                            <div style={{fontWeight:'700', fontSize:'1rem', color: isComplete ? 'var(--success)' : 'inherit'}}>{percent.toFixed(0)}%</div>
+                            {!isComplete && (<button onClick={() => quickAddGoalFund(goal.id)} style={{background:'none', border:'none', color:'var(--accent-blue-gray)', fontSize:'0.7rem', fontWeight:'600', cursor:'pointer', padding:'0.15rem 0'}}>+ Add Fund</button>)}
+                          </div>
+                        </div>
+                        <div style={{height:'6px', background:'var(--bg-input)', borderRadius:'3px', overflow:'hidden'}}>
+                          <div style={{height:'100%', width:`${percent}%`, background: isComplete ? 'var(--success)' : CHART_COLORS[i % CHART_COLORS.length], borderRadius:'3px'}}></div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Recent Transactions */}
+            <div className="widget-card" style={{padding:'1.25rem'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
+                <span style={{fontWeight:'700', fontSize:'0.95rem'}}>Recent Transactions</span>
+                <button onClick={() => setActiveView('transactions')} style={{background:'none', border:'none', color:'var(--text-secondary)', fontSize:'0.8rem', fontWeight:'600', cursor:'pointer'}}>See all ›</button>
+              </div>
+              <div className="transaction-list">
+                {filteredTransactions.length === 0 && <span style={{color:'var(--text-secondary)', fontSize:'0.85rem'}}>No transactions found.</span>}
                 {filteredTransactions.slice(0, 5).map((tx, i) => (
-                  <div key={tx.id} className="transaction-item" style={{background:'var(--bg-card)', padding:'1rem', borderRadius:'16px'}}>
+                  <div key={tx.id} className="transaction-item" style={{padding:'0.75rem 0', borderBottom: i < Math.min(filteredTransactions.length, 5) - 1 ? '1px solid var(--border-color)' : 'none'}}>
                     <div className="transaction-left">
-                      <div className="transaction-avatar" style={{background: tx.category === 'Income' ? 'var(--success)' : tx.category.includes('Transfer') ? 'var(--accent-blue-gray)' : `hsl(${i * 60 + 10}, 70%, 50%)`}}>
+                      <div className="transaction-avatar" style={{width:'40px', height:'40px', fontSize:'1rem', background: tx.category === 'Income' ? 'var(--success)' : tx.category.includes('Transfer') ? 'var(--accent-blue-gray)' : `hsl(${i * 60 + 10}, 70%, 50%)`}}>
                         {getInitial(tx.name.replace('Transfer to ', '').replace('Transfer from ', ''))}
                       </div>
                       <div className="transaction-details">
-                        <span className="transaction-name" style={{color:'var(--text-primary)'}}>{tx.name}</span>
-                        <span className="transaction-date">{tx.date}</span>
+                        <span className="transaction-name" style={{color:'var(--text-primary)', fontSize:'0.9rem'}}>{tx.name}</span>
+                        <span className="transaction-date" style={{fontSize:'0.75rem'}}>{tx.date} · {tx.account}</span>
                       </div>
                     </div>
                     <div className="transaction-right">
-                      <div className={`transaction-amount ${tx.category === 'Income' || tx.category === 'Transfer In' ? 'income' : 'expense'}`}>
+                      <div className={`transaction-amount ${tx.category === 'Income' || tx.category === 'Transfer In' ? 'income' : 'expense'}`} style={{fontSize:'0.95rem'}}>
                         {tx.category === 'Income' || tx.category === 'Transfer In' ? '+' : '-'} {formatIDR(tx.amount)}
                       </div>
+                      <div className="transaction-category" style={{fontSize:'0.7rem'}}>{tx.category}</div>
                     </div>
                   </div>
                 ))}
+              </div>
             </div>
+
+            {/* AI Insight */}
+            <InsightCard
+              monthlyInsight={monthlyInsight}
+              isInsightLoading={isInsightLoading}
+              fetchMonthlyInsight={fetchMonthlyInsight}
+              viewMonthName={viewMonthName}
+            />
           </div>
         </div>
       </>
@@ -170,7 +277,7 @@ export const HomeView = ({
           <div className="widget-card" style={{padding:'1.5rem'}}>
             <div className="widget-header">
               <span className="widget-title">My Accounts</span>
-              <a href="#" className="see-all">See all ›</a>
+              <button className="see-all" onClick={() => { setIsSettingsOpen(true); setSettingsTab('accounts'); }} style={{background:'none', border:'none'}}>See all ›</button>
             </div>
             <div className="cards-container">
               {accounts.length === 0 && <span style={{color:'var(--text-secondary)'}}>No accounts yet.</span>}
@@ -330,7 +437,15 @@ export const HomeView = ({
             </div>
           </div>
         </div>
+
+          <InsightCard
+            monthlyInsight={monthlyInsight}
+            isInsightLoading={isInsightLoading}
+            fetchMonthlyInsight={fetchMonthlyInsight}
+            viewMonthName={viewMonthName}
+          />
       </div>
     </>
   );
 };
+
