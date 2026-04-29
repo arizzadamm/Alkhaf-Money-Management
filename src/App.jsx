@@ -401,34 +401,22 @@ function App() {
     const passwordHash = await hashPassword(password);
 
     try {
-      let { data, error } = await supabase
-        .from('app_users')
-        .select('*')
-        .eq('username', username)
-        .eq('password', passwordHash)
-        .single();
+      const { data, error } = await supabase.functions.invoke('auth-session', {
+        body: { action: 'login', username, passwordHash, rememberMe }
+      });
 
-      if (error || !data) {
-        const legacyLogin = await supabase
-          .from('app_users')
-          .select('*')
-          .eq('username', username)
-          .eq('password', password)
-          .single();
-
-        data = legacyLogin.data;
-        error = legacyLogin.error;
-
-        if (data) {
-          await supabase.from('app_users').update({ password: passwordHash }).eq('id', data.id);
-        }
+      if (error || data?.error) {
+        return setLoginError(data?.error || error?.message || 'Login gagal!');
       }
 
-      if (error || !data) return setLoginError('Username atau Password salah!');
+      const result = data?.data;
+      if (!result?.user || !result?.sessionToken) {
+        return setLoginError('Respons login tidak valid.');
+      }
 
-      const userData = { id: data.id, name: data.username, role: data.role };
+      const userData = { id: result.user.id, name: result.user.username, role: result.user.role };
       setUser(userData);
-      setActiveView(data.role === 'admin' ? 'admin' : 'home');
+      setActiveView(result.user.role === 'admin' ? 'admin' : 'home');
       localStorage.setItem(REMEMBER_ME_KEY, String(rememberMe));
 
       if (rememberMe) {
@@ -439,13 +427,21 @@ function App() {
         localStorage.removeItem(SESSION_STORAGE_KEY);
       }
 
-      storeSessionProof(passwordHash, rememberMe);
+      storeSessionProof(result.sessionToken, rememberMe);
     } catch {
-      setLoginError('Terjadi kesalahan koneksi database.');
+      setLoginError('Terjadi kesalahan koneksi.');
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const sessionProof = getStoredSessionProof();
+    if (sessionProof && user?.id) {
+      try {
+        await supabase.functions.invoke('auth-session', {
+          body: { action: 'logout', requesterId: user.id, sessionToken: sessionProof }
+        });
+      } catch { /* ignore logout errors */ }
+    }
     setUser(null);
     setActiveView('home');
     setAdminError('');
@@ -615,7 +611,7 @@ function App() {
 
     if (result.error) {
       setTransactions(transactions.map(tx => tx.id === id ? { ...tx, isPaid: currentStatus } : tx));
-      alert(result.error);
+      addToast(result.error, 'error');
       return;
     }
 
@@ -627,7 +623,7 @@ function App() {
 
     const result = await invokeFinanceAction('insert_transactions', { rows: newRows });
     if (result.error) {
-      alert(result.error);
+      addToast(result.error, 'error');
       return;
     }
 
@@ -681,16 +677,40 @@ function App() {
     }
   };
 
-  const removeTransaction = async (id) => {
-    setTransactions(transactions.filter(tx => tx.id !== id));
-    const result = await invokeFinanceAction('delete_transaction', { transactionId: id });
-    if (result.error) {
-      alert(result.error);
-      await fetchTransactions();
-      return;
+  const removeTransaction = (id) => {
+    const deletedTx = transactions.find(tx => tx.id === id);
+    if (!deletedTx) return;
+
+    setTransactions(prev => prev.filter(tx => tx.id !== id));
+
+    if (pendingDeleteRef.current) {
+      clearTimeout(pendingDeleteRef.current.timer);
+      const prev = pendingDeleteRef.current;
+      invokeFinanceAction('delete_transaction', { transactionId: prev.id }).then(() => fetchGlobalTransactions());
     }
 
-    await fetchGlobalTransactions();
+    const timer = setTimeout(async () => {
+      pendingDeleteRef.current = null;
+      const result = await invokeFinanceAction('delete_transaction', { transactionId: id });
+      if (result.error) {
+        addToast(result.error, 'error');
+        await fetchTransactions();
+      }
+      await fetchGlobalTransactions();
+    }, 8000);
+
+    pendingDeleteRef.current = { id, tx: deletedTx, timer };
+
+    addToast('"' + deletedTx.name + '" dihapus', 'undo', {
+      action: () => {
+        clearTimeout(timer);
+        pendingDeleteRef.current = null;
+        setTransactions(prev => [...prev, deletedTx].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date)));
+        addToast('Transaksi berhasil dikembalikan!', 'success');
+      },
+      actionLabel: 'Undo',
+      duration: 8000
+    });
   };
 
   const persistSettings = async (nextSettings) => {
@@ -1065,6 +1085,48 @@ function App() {
   const donutChartData = categories.map((cat, i) => ({
     name: cat.name, value: totals.categoryTotals[cat.name] || 0, color: CHART_COLORS[i % CHART_COLORS.length]
   })).filter(d => d.value > 0); 
+
+  const budgetAlerts = useMemo(() => {
+    return categories.map(cat => {
+      const spent = totals.categoryTotals[cat.name] || 0;
+      const target = (cat.targetPercentage / 100) * effectiveTotalIncome;
+      const percent = target > 0 ? (spent / target) * 100 : 0;
+      return { name: cat.name, spent, target, percent, status: percent >= 100 ? 'over' : percent >= 80 ? 'warning' : 'ok' };
+    });
+  }, [categories, totals, effectiveTotalIncome]);
+
+  // Show budget alert toasts on data load
+  const budgetAlertShownRef = useRef(false);
+  useEffect(() => {
+    if (!user || isAdmin || budgetAlerts.length === 0 || isLoading) return;
+    if (budgetAlertShownRef.current) return;
+    const alerts = budgetAlerts.filter(a => a.status === 'over' || a.status === 'warning');
+    if (alerts.length > 0) {
+      budgetAlertShownRef.current = true;
+      alerts.slice(0, 3).forEach((a, i) => {
+        setTimeout(() => {
+          addToast(a.name + ': ' + a.percent.toFixed(0) + '% dari budget', a.status === 'over' ? 'error' : 'warning');
+        }, (i + 1) * 800);
+      });
+    }
+  }, [budgetAlerts, user, isAdmin, isLoading, addToast]);
+
+  const unpaidCount = useMemo(() => transactions.filter(t => !t.isPaid && t.category !== 'Income' && !t.category.includes('Transfer')).length, [transactions]);
+
+  const notifications = useMemo(() => {
+    const items = [];
+    budgetAlerts.forEach(a => {
+      if (a.status === 'over') items.push({ id: 'budget-over-' + a.name, type: 'danger', title: a.name + ' Over Budget!', desc: 'Pengeluaran ' + a.percent.toFixed(0) + '% dari budget (' + formatIDR(a.spent) + ' / ' + formatIDR(a.target) + ')' });
+      else if (a.status === 'warning') items.push({ id: 'budget-warn-' + a.name, type: 'warning', title: a.name + ' Hampir Limit', desc: 'Sudah ' + a.percent.toFixed(0) + '% dari budget (' + formatIDR(a.spent) + ' / ' + formatIDR(a.target) + ')' });
+    });
+    if (unpaidCount > 0) items.push({ id: 'unpaid', type: 'info', title: unpaidCount + ' Transaksi Belum Dibayar', desc: 'Ada transaksi yang belum ditandai sebagai paid.' });
+    goals.forEach(goal => {
+      const pct = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+      if (pct >= 100) items.push({ id: 'goal-done-' + goal.id, type: 'success', title: goal.name + ' Tercapai!', desc: 'Selamat! Target tabungan sudah terpenuhi.' });
+      else if (pct >= 75) items.push({ id: 'goal-75-' + goal.id, type: 'info', title: goal.name + ' ' + pct.toFixed(0) + '%', desc: 'Hampir mencapai target tabungan!' });
+    });
+    return items;
+  }, [budgetAlerts, unpaidCount, goals]);
 
   const renderTelegramProfilePanel = () => (
     <div className="widget-card telegram-profile-card">
@@ -2125,7 +2187,7 @@ function App() {
           <div>
              <div style={{marginBottom: '1.5rem'}}>
               <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Income Bulanan (IDR)</label>
-              <input type="number" className="form-input" value={baseTotalIncome} onChange={(e) => setBaseTotalIncome(Number(e.target.value))} />
+              <FormattedNumberInput value={baseTotalIncome} onChange={(num) => setBaseTotalIncome(num)} />
               <div style={{marginTop: '0.5rem', fontSize: '0.85rem', color: sumOfAccounts !== baseTotalIncome ? 'var(--danger)' : 'var(--success)'}}>
                 Total akun: {formatIDR(sumOfAccounts)}
               </div>
@@ -2138,7 +2200,7 @@ function App() {
             {accounts.map(acc => (
               <div style={{display:'flex', gap:'0.5rem', marginBottom:'0.5rem'}} key={acc.id}>
                 <input type="text" className="form-input" value={acc.name} onChange={(e) => setAccounts(accounts.map(a => a.id === acc.id ? { ...a, name: e.target.value } : a))} placeholder="Account Name"/>
-                <input type="number" className="form-input" value={acc.balance} onChange={(e) => setAccounts(accounts.map(a => a.id === acc.id ? { ...a, balance: Number(e.target.value) } : a))} placeholder="Initial Balance"/>
+                <FormattedNumberInput value={acc.balance} onChange={(num) => setAccounts(accounts.map(a => a.id === acc.id ? { ...a, balance: num } : a))} placeholder="Initial Balance"/>
                 <button className="btn-danger" onClick={() => setAccounts(accounts.filter(a => a.id !== acc.id))}><Trash2 size={20}/></button>
               </div>
             ))}
@@ -2181,11 +2243,11 @@ function App() {
                 <div style={{display:'flex', gap:'0.5rem'}}>
                   <div style={{flex:1}}>
                     <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Terkumpul</label>
-                    <input type="number" className="form-input" value={goal.currentAmount} onChange={(e) => setGoals(goals.map(g => g.id === goal.id ? { ...g, currentAmount: Number(e.target.value) } : g))} placeholder="0"/>
+                    <FormattedNumberInput value={goal.currentAmount} onChange={(num) => setGoals(goals.map(g => g.id === goal.id ? { ...g, currentAmount: num } : g))} placeholder="0"/>
                   </div>
                   <div style={{flex:1}}>
                     <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Target</label>
-                    <input type="number" className="form-input" value={goal.targetAmount} onChange={(e) => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetAmount: Number(e.target.value) } : g))} placeholder="1000000"/>
+                    <FormattedNumberInput value={goal.targetAmount} onChange={(num) => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetAmount: num } : g))} placeholder="1000000"/>
                   </div>
                 </div>
               </div>
@@ -2223,7 +2285,7 @@ function App() {
               </div>
               <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Amount (IDR)</label>
-                <input type="number" name="amount" className="form-input" placeholder="0" required />
+                <FormattedNumberInput name="amount" placeholder="0" required />
               </div>
               <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Account</label>
@@ -2263,7 +2325,7 @@ function App() {
               </div>
               <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Amount (IDR)</label>
-                <input type="number" name="amount" className="form-input" placeholder="0" required />
+                <FormattedNumberInput name="amount" placeholder="0" required />
               </div>
               <div style={{marginBottom:'1.5rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Deposit To Account</label>
@@ -2293,7 +2355,7 @@ function App() {
               </div>
               <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Amount (IDR)</label>
-                <input type="number" name="amount" className="form-input" placeholder="0" required />
+                <FormattedNumberInput name="amount" placeholder="0" required />
               </div>
               <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>From Account</label>
@@ -2336,7 +2398,7 @@ function App() {
               </div>
               <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Jumlah (IDR)</label>
-                <input type="number" name="amount" className="form-input" defaultValue={editingTransaction.amount} required />
+                <FormattedNumberInput name="amount" defaultValue={editingTransaction.amount} required />
               </div>
               <div style={{marginBottom:'1rem'}}>
                 <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Akun</label>
