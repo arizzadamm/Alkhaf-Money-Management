@@ -1,168 +1,43 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Home, CreditCard, User, Search, Bell, Settings, Plus, ArrowDownRight, Trash2, X, Download, QrCode, LogOut, ArrowUpRight, CheckCircle2, ArrowRightLeft, Moon, Sun, Target, Eye, ChevronRight, Users, Pencil, AlertTriangle, Filter } from 'lucide-react';
-import { BarChart, Bar, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import QRCode from 'qrcode';
-import { supabase } from './supabaseClient';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
-const formatIDR = (amount) => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0
-  }).format(Number(amount) || 0);
-};
+// Hooks
+import { useToast } from './hooks/useToast.jsx';
+import { useTheme } from './hooks/useTheme';
+import { useAuth } from './hooks/useAuth';
+import { useFinance } from './hooks/useFinance';
+import { useAdmin } from './hooks/useAdmin';
+import { useTelegram } from './hooks/useTelegram';
 
-const parseTransactionDate = (transaction) => {
-  const rawDate = transaction.created_at || transaction.date;
-  const parsedDate = rawDate ? new Date(rawDate) : new Date();
-  return Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-};
+// Utils
+import { exportTransactionsToCSV } from './utils/csv';
 
-const getTransactionType = (transaction) => {
-  if (transaction.category === 'Income' || transaction.category === 'Transfer In') return 'income';
-  if (transaction.category === 'Transfer Out') return 'transfer';
-  return 'expense';
-};
+// Auth
+import { LoginScreen } from './components/auth/LoginScreen';
 
-const formatPeriodLabel = (date, period) => {
-  if (period === 'month') {
-    return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-  }
+// Layout
+import { Sidebar } from './components/layout/Sidebar';
+import { TopBar } from './components/layout/TopBar';
+import { MobileHeader } from './components/layout/MobileHeader';
+import { MobileBottomNav } from './components/layout/MobileBottomNav';
 
-  if (period === 'week') {
-    const weekStart = new Date(date);
-    const day = weekStart.getDay() || 7;
-    weekStart.setDate(weekStart.getDate() - day + 1);
+// Views
+import { HomeView } from './components/views/HomeView';
+import { TransactionsView } from './components/views/TransactionsView';
+import { AdminView } from './components/views/AdminView';
+import { ProfileView } from './components/views/ProfileView';
 
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
+// Modals
+import { SettingsModal } from './components/modals/SettingsModal';
+import { AddExpenseModal } from './components/modals/AddExpenseModal';
+import { TopUpModal } from './components/modals/TopUpModal';
+import { TransferModal } from './components/modals/TransferModal';
+import { EditTransactionModal } from './components/modals/EditTransactionModal';
+import { ChangePasswordModal } from './components/modals/ChangePasswordModal';
 
-    return `${weekStart.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`;
-  }
-
-  return date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
-};
-
-const getPeriodKey = (date, period) => {
-  const keyDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-  if (period === 'month') {
-    return `${keyDate.getFullYear()}-${String(keyDate.getMonth() + 1).padStart(2, '0')}`;
-  }
-
-  if (period === 'week') {
-    const day = keyDate.getDay() || 7;
-    keyDate.setDate(keyDate.getDate() - day + 1);
-  }
-
-  return keyDate.toISOString().slice(0, 10);
-};
-
-const getInitial = (name) => name ? name.charAt(0).toUpperCase() : '?';
-const SESSION_STORAGE_KEY = 'alkhaf_user_session';
-const REMEMBER_ME_KEY = 'alkhaf_remember_me';
-const SESSION_PROOF_KEY = 'alkhaf_session_proof';
-const TELEGRAM_BOT_USERNAME = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').replace(/^@+/, '').trim();
-
-const AlkaFlowLogoMark = ({ size = 72, className = '' }) => (
-  <svg
-    className={className}
-    width={size}
-    height={size}
-    viewBox="0 0 120 120"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-  >
-    <defs>
-      <linearGradient id="alkaflowArcDark" x1="18" y1="92" x2="78" y2="24" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#7EA43C" />
-        <stop offset="0.45" stopColor="#1B5B3D" />
-        <stop offset="1" stopColor="#0E3426" />
-      </linearGradient>
-      <linearGradient id="alkaflowArcLime" x1="82" y1="18" x2="98" y2="76" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#F1FF63" />
-        <stop offset="1" stopColor="#D2F411" />
-      </linearGradient>
-      <linearGradient id="alkaflowArcOlive" x1="22" y1="48" x2="52" y2="102" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#C4DD5D" />
-        <stop offset="1" stopColor="#5D8932" />
-      </linearGradient>
-      <linearGradient id="alkaflowArcDeep" x1="76" y1="82" x2="100" y2="38" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#14503A" />
-        <stop offset="1" stopColor="#0A2C20" />
-      </linearGradient>
-    </defs>
-    <circle cx="60" cy="60" r="37" fill="none" stroke="url(#alkaflowArcDark)" strokeWidth="22" strokeLinecap="round" strokeDasharray="112 260" transform="rotate(132 60 60)" />
-    <circle cx="60" cy="60" r="37" fill="none" stroke="url(#alkaflowArcLime)" strokeWidth="22" strokeLinecap="round" strokeDasharray="74 298" transform="rotate(-44 60 60)" />
-    <circle cx="60" cy="60" r="37" fill="none" stroke="url(#alkaflowArcOlive)" strokeWidth="22" strokeLinecap="round" strokeDasharray="58 314" transform="rotate(170 60 60)" />
-    <circle cx="60" cy="60" r="37" fill="none" stroke="url(#alkaflowArcDeep)" strokeWidth="22" strokeLinecap="round" strokeDasharray="86 286" transform="rotate(48 60 60)" opacity="0.92" />
-  </svg>
-);
-
-const AlkaFlowWordmark = ({ compact = false }) => (
-  <div className={`alkaflow-wordmark${compact ? ' compact' : ''}`}>
-    <span className="alkaflow-wordmark-primary">Alka</span>
-    <span className="alkaflow-wordmark-accent">Flow</span>
-  </div>
-);
-
-const hashPassword = async (password) => {
-  const bytes = new TextEncoder().encode(password);
-  const buffer = await window.crypto.subtle.digest('SHA-256', bytes);
-  const hash = Array.from(new Uint8Array(buffer))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-
-  return `sha256:${hash}`;
-};
-
-const CHART_COLORS = ['#d2f411', '#213f31', '#2d5866', '#94a3b8', '#cbd5e1', '#86efac', '#bbf7d0', '#e2e8f0'];
-
-const ToastItem = ({ toast, onDismiss }) => {
-  useEffect(() => {
-    const timer = setTimeout(() => onDismiss(toast.id), toast.duration || 4000);
-    return () => clearTimeout(timer);
-  }, [toast.id, toast.duration, onDismiss]);
-
-  return (
-    <div className={`toast-item toast-${toast.type}`}>
-      <span className="toast-message">{toast.message}</span>
-      <div className="toast-actions">
-        {toast.action && (
-          <button className="toast-action-btn" onClick={() => { toast.action(); onDismiss(toast.id); }}>
-            {toast.actionLabel}
-          </button>
-        )}
-        <button className="toast-close-btn" onClick={() => onDismiss(toast.id)}>
-          <X size={16} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const FormattedNumberInput = ({ value, onChange, className = '', ...props }) => {
-  const formatDisplay = (num) => num ? Number(num).toLocaleString('id-ID') : '';
-  const [display, setDisplay] = useState(formatDisplay(value));
-
-  useEffect(() => { setDisplay(formatDisplay(value)); }, [value]);
-
-  const handleChange = (e) => {
-    const raw = e.target.value.replace(/\D/g, '');
-    const num = Number(raw) || 0;
-    setDisplay(num.toLocaleString('id-ID'));
-    onChange(num);
-  };
-
-  return (
-    <div className="formatted-input-wrapper">
-      <span className="formatted-input-prefix">Rp</span>
-      <input type="text" inputMode="numeric" value={display} onChange={handleChange} className={`form-input formatted-input-field ${className}`} {...props} />
-    </div>
-  );
-};
+// UI
+import { ToastContainer } from './components/ui/ToastContainer';
+import { NotificationPanel } from './components/NotificationPanel';
 
 function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -172,935 +47,67 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const getStoredSessionProof = () => localStorage.getItem(SESSION_PROOF_KEY) || sessionStorage.getItem(SESSION_PROOF_KEY);
+  // Core hooks
+  const { toasts, addToast, removeToast } = useToast();
+  const { isDarkMode, toggleTheme } = useTheme();
+  const auth = useAuth(addToast);
+  const finance = useFinance(auth.user, addToast, auth.getStoredSessionProof);
+  const admin = useAdmin(auth.user, auth.getStoredSessionProof);
+  const telegram = useTelegram(auth.user, auth.isAdmin, auth.getStoredSessionProof);
 
-  const storeSessionProof = (proof, shouldRemember) => {
-    if (shouldRemember) {
-      localStorage.setItem(SESSION_PROOF_KEY, proof);
-      sessionStorage.removeItem(SESSION_PROOF_KEY);
-    } else {
-      sessionStorage.setItem(SESSION_PROOF_KEY, proof);
-      localStorage.removeItem(SESSION_PROOF_KEY);
-    }
-  };
-
-  const [user, setUser] = useState(null); 
+  // View state
   const [activeView, setActiveView] = useState('home');
-  const [isLoading, setIsLoading] = useState(true);
-  const [loginError, setLoginError] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
-  const [adminError, setAdminError] = useState('');
-  const [adminSuccess, setAdminSuccess] = useState('');
-  
-  const [baseTotalIncome, setBaseTotalIncome] = useState(0);
-  const [accounts, setAccounts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [goals, setGoals] = useState([]); 
-  const [transactions, setTransactions] = useState([]); 
-  const [globalTransactions, setGlobalTransactions] = useState([]);
-  const [adminUsers, setAdminUsers] = useState([]);
-  const [editingAdminUserId, setEditingAdminUserId] = useState(null);
-  const [telegramConnections, setTelegramConnections] = useState([]);
-  const [telegramLinkToken, setTelegramLinkToken] = useState(null);
-  const [telegramError, setTelegramError] = useState('');
-  const [telegramSuccess, setTelegramSuccess] = useState('');
-  const [isTelegramLoading, setIsTelegramLoading] = useState(false);
-  const [telegramQrCode, setTelegramQrCode] = useState('');
-  
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
-  
-  const [monthOffset, setMonthOffset] = useState(0); 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [transactionGroupBy, setTransactionGroupBy] = useState('day');
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const isAdmin = user?.role === 'admin';
-
-  // Toast system
-  const [toasts, setToasts] = useState([]);
-  const addToast = useCallback((message, type = 'info', options = {}) => {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const duration = options.duration || (type === 'undo' ? 8000 : 4000);
-    setToasts(prev => [...prev, { id, message, type, action: options.action, actionLabel: options.actionLabel || 'Undo', duration }]);
-    return id;
-  }, []);
-  const removeToast = useCallback((id) => { setToasts(prev => prev.filter(t => t.id !== id)); }, []);
-
-  // Edit transaction
-  const [editingTransaction, setEditingTransaction] = useState(null);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-
-  // Change credentials
-  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-  const [changePasswordError, setChangePasswordError] = useState('');
-
-  // Undo delete
-  const pendingDeleteRef = useRef(null);
-
-  // Notifications
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [readNotifications, setReadNotifications] = useState(new Set());
 
-  // Filters
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterAccount, setFilterAccount] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [sortBy, setSortBy] = useState('date');
-  const [sortOrder, setSortOrder] = useState('desc');
-  
-  const getReferenceDate = useMemo(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + monthOffset);
-    return d;
-  }, [monthOffset]);
-
-  const viewMonthName = getReferenceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-  
-  const activeBudgetMonth = useMemo(() => {
-    const year = getReferenceDate.getFullYear();
-    const month = String(getReferenceDate.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
-  }, [getReferenceDate]);
-
-  const timelineMonths = useMemo(() => {
-    const result = [];
-    const d = new Date();
-    for (let i = -4; i <= 1; i++) {
-      const monthDate = new Date(d.getFullYear(), d.getMonth() + i, 1);
-      const year = monthDate.getFullYear();
-      const monthStr = String(monthDate.getMonth() + 1).padStart(2, '0');
-      
-      result.push({
-        label: monthDate.toLocaleString('en-US', { month: 'short' }),
-        offset: i,
-        budgetMonthValue: `${year}-${monthStr}`
-      });
-    }
-    return result;
-  }, []);
-
+  // Set initial view based on role
   useEffect(() => {
-    const handle = window.setTimeout(() => {
-      const savedSession = localStorage.getItem(SESSION_STORAGE_KEY) || sessionStorage.getItem(SESSION_STORAGE_KEY);
-      if (savedSession) {
-        const parsedUser = JSON.parse(savedSession);
-        setUser(parsedUser);
-        setActiveView(parsedUser.role === 'admin' ? 'admin' : 'home');
-      }
-
-      const savedRememberMe = localStorage.getItem(REMEMBER_ME_KEY);
-      if (savedRememberMe !== null) setRememberMe(savedRememberMe === 'true');
-
-      const savedTheme = localStorage.getItem('alkhaf_theme');
-      if (savedTheme === 'dark') {
-        setIsDarkMode(true);
-        document.documentElement.setAttribute('data-theme', 'dark');
-      }
-    }, 0);
-
-    return () => window.clearTimeout(handle);
-  }, []);
-
-  const toggleTheme = () => {
-    if (isDarkMode) {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.setItem('alkhaf_theme', 'light');
-      setIsDarkMode(false);
-    } else {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('alkhaf_theme', 'dark');
-      setIsDarkMode(true);
+    if (auth.user) {
+      if (auth.isAdmin && activeView === 'home') setActiveView('admin');
     }
-  };
+  }, [auth.user, auth.isAdmin]);
 
-  const invokeFinanceAction = useCallback(async (action, payload = {}) => {
-    if (!user?.id) return { error: 'User tidak ditemukan.' };
-
-    const sessionProof = getStoredSessionProof();
-    if (!sessionProof) return { error: 'Sesi tidak ditemukan. Silakan login ulang.' };
-
-    const { data, error } = await supabase.functions.invoke('user-finance', {
-      body: {
-        action,
-        requesterId: user.id,
-        sessionProof,
-        ...payload
-      }
-    });
-
-    if (error || data?.error) {
-      return { error: data?.error || error?.message || 'Gagal memproses data keuangan.' };
-    }
-
-    return { data: data?.data };
-  }, [user]);
-
-  const fetchSettings = useCallback(async () => {
-    if (!user?.id) return;
-
-    const result = await invokeFinanceAction('get_settings');
-    if (result.error) {
-      console.error('Failed to fetch settings:', result.error);
-      return;
-    }
-
-    const data = result.data;
-    if (data) {
-      setBaseTotalIncome(Number(data.total_income) || 0);
-      setAccounts(data.accounts || []);
-      setCategories(data.categories || []);
-      setGoals(data.goals || []);
-    } else {
-      setBaseTotalIncome(0);
-      setAccounts([]);
-      setCategories([]);
-      setGoals([]);
-    }
-  }, [invokeFinanceAction, user]);
-
-  const fetchTransactions = useCallback(async () => {
-    if (!user?.id) return;
-
-    const result = await invokeFinanceAction('list_transactions', {
-      budgetMonth: activeBudgetMonth
-    });
-    if (result.error) {
-      console.error('Failed to fetch transactions:', result.error);
-      return;
-    }
-
-    const data = result.data || [];
-    if (data) {
-      const mapped = data.map(d => ({ ...d, isPaid: d.is_paid }));
-      setTransactions(mapped);
-    }
-  }, [activeBudgetMonth, invokeFinanceAction, user]);
-
-  const fetchGlobalTransactions = useCallback(async () => {
-    if (!user?.id) return;
-
-    const result = await invokeFinanceAction('list_global_transactions');
-    if (result.error) {
-      console.error('Failed to fetch global transactions:', result.error);
-      return;
-    }
-
-    const data = result.data || [];
-    if (data) setGlobalTransactions(data);
-  }, [invokeFinanceAction, user]);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    const username = e.target.username.value;
-    const password = e.target.password.value;
-    const passwordHash = await hashPassword(password);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('auth-session', {
-        body: { action: 'login', username, passwordHash, rememberMe }
-      });
-
-      if (error || data?.error) {
-        return setLoginError(data?.error || error?.message || 'Login gagal!');
-      }
-
-      const result = data?.data;
-      if (!result?.user || !result?.sessionToken) {
-        return setLoginError('Respons login tidak valid.');
-      }
-
-      const userData = { id: result.user.id, name: result.user.username, role: result.user.role };
-      setUser(userData);
-      setActiveView(result.user.role === 'admin' ? 'admin' : 'home');
-      localStorage.setItem(REMEMBER_ME_KEY, String(rememberMe));
-
-      if (rememberMe) {
-        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
-      } else {
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-      }
-
-      storeSessionProof(result.sessionToken, rememberMe);
-    } catch {
-      setLoginError('Terjadi kesalahan koneksi.');
-    }
-  };
-
-  const handleLogout = async () => {
-    const sessionProof = getStoredSessionProof();
-    if (sessionProof && user?.id) {
-      try {
-        await supabase.functions.invoke('auth-session', {
-          body: { action: 'logout', requesterId: user.id, sessionToken: sessionProof }
-        });
-      } catch { /* ignore logout errors */ }
-    }
-    setUser(null);
-    setActiveView('home');
-    setAdminError('');
-    setAdminSuccess('');
-    setBaseTotalIncome(0);
-    setAccounts([]);
-    setCategories([]);
-    setGoals([]);
-    setTransactions([]);
-    setGlobalTransactions([]);
-    setAdminUsers([]);
-    setEditingAdminUserId(null);
-    localStorage.removeItem(SESSION_STORAGE_KEY);
-    sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    localStorage.removeItem(SESSION_PROOF_KEY);
-    sessionStorage.removeItem(SESSION_PROOF_KEY);
-  };
-
-  const fetchAdminUsers = useCallback(async () => {
-    if (!isAdmin) return;
-
-    const sessionProof = getStoredSessionProof();
-    if (!sessionProof) {
-      setAdminError('Sesi admin tidak ditemukan. Silakan login ulang.');
-      return;
-    }
-
-    const { data, error } = await supabase.functions.invoke('admin-user-management', {
-      body: {
-        action: 'list',
-        requesterId: user.id,
-        sessionProof
-      }
-    });
-
-    if (error || data?.error) {
-      setAdminError(data?.error || error?.message || 'Gagal mengambil daftar user.');
-      return;
-    }
-
-    setAdminUsers(data?.data || []);
-  }, [isAdmin, user]);
-
+  // Data fetching effect
   useEffect(() => {
-    if (!user) return;
+    if (!auth.user) return;
 
     const handle = window.setTimeout(() => {
-      setIsLoading(true);
-      if (user.role === 'admin') {
-        fetchAdminUsers().finally(() => setIsLoading(false));
+      auth.setIsLoading(true);
+      if (auth.isAdmin) {
+        admin.fetchAdminUsers().finally(() => auth.setIsLoading(false));
         return;
       }
 
       Promise.all([
-        fetchSettings(),
-        fetchTransactions(),
-        fetchGlobalTransactions()
-      ]).finally(() => setIsLoading(false));
+        finance.fetchSettings(),
+        finance.fetchTransactions(),
+        finance.fetchGlobalTransactions()
+      ]).then(() => finance.autoGenerateIncome()).finally(() => auth.setIsLoading(false));
     }, 0);
 
     return () => window.clearTimeout(handle);
-  }, [fetchAdminUsers, fetchGlobalTransactions, fetchSettings, fetchTransactions, user, monthOffset]);
+  }, [auth.user, finance.monthOffset]);
 
-  const resetTelegramFeedback = () => {
-    setTelegramError('');
-    setTelegramSuccess('');
-  };
-
-  const invokeTelegramLinkAction = useCallback(async (action, payload = {}) => {
-    if (!user?.id) return { error: 'User tidak ditemukan.' };
-
-    const sessionProof = getStoredSessionProof();
-    if (!sessionProof) return { error: 'Sesi tidak ditemukan. Silakan login ulang.' };
-
-    const { data, error } = await supabase.functions.invoke('telegram-link', {
-      body: {
-        action,
-        requesterId: user.id,
-        sessionProof,
-        ...payload
-      }
-    });
-
-    if (error || data?.error) {
-      return { error: data?.error || error?.message || 'Gagal terhubung ke layanan Telegram.' };
-    }
-
-    return { data: data?.data };
-  }, [user]);
-
-  const fetchTelegramConnections = useCallback(async () => {
-    if (!user?.id || isAdmin) return;
-
-    setIsTelegramLoading(true);
-    resetTelegramFeedback();
-
-    const result = await invokeTelegramLinkAction('list_connections');
-    if (result.error) {
-      setTelegramError(result.error);
-      setIsTelegramLoading(false);
-      return;
-    }
-
-    setTelegramConnections(result.data || []);
-    setIsTelegramLoading(false);
-  }, [invokeTelegramLinkAction, isAdmin, user]);
-
-  const generateTelegramLinkToken = async () => {
-    if (!user?.id || isAdmin) return;
-
-    setIsTelegramLoading(true);
-    resetTelegramFeedback();
-
-    const result = await invokeTelegramLinkAction('generate_token');
-    if (result.error) {
-      setTelegramError(result.error);
-      setIsTelegramLoading(false);
-      return;
-    }
-
-    setTelegramLinkToken(result.data);
-    setTelegramSuccess('Token linking baru berhasil dibuat. Kirim ke bot Telegram dalam 15 menit.');
-    setIsTelegramLoading(false);
-  };
-
-  const setPrimaryTelegramConnection = async (connectionId) => {
-    setIsTelegramLoading(true);
-    resetTelegramFeedback();
-
-    const result = await invokeTelegramLinkAction('set_primary', { connectionId });
-    if (result.error) {
-      setTelegramError(result.error);
-      setIsTelegramLoading(false);
-      return;
-    }
-
-    setTelegramSuccess('Koneksi utama Telegram berhasil diperbarui.');
-    await fetchTelegramConnections();
-    setIsTelegramLoading(false);
-  };
-
-  const unlinkTelegramConnection = async (connectionId) => {
-    const confirmed = window.confirm('Lepas koneksi Telegram ini dari akun Anda?');
-    if (!confirmed) return;
-
-    setIsTelegramLoading(true);
-    resetTelegramFeedback();
-
-    const result = await invokeTelegramLinkAction('unlink_connection', { connectionId });
-    if (result.error) {
-      setTelegramError(result.error);
-      setIsTelegramLoading(false);
-      return;
-    }
-
-    setTelegramSuccess('Koneksi Telegram berhasil dilepas.');
-    await fetchTelegramConnections();
-    setIsTelegramLoading(false);
-  };
-
-  const togglePaid = async (id, currentStatus) => {
-    setTransactions(transactions.map(tx => tx.id === id ? { ...tx, isPaid: !currentStatus } : tx));
-    const result = await invokeFinanceAction('toggle_paid', {
-      transactionId: id,
-      isPaid: !currentStatus
-    });
-
-    if (result.error) {
-      setTransactions(transactions.map(tx => tx.id === id ? { ...tx, isPaid: currentStatus } : tx));
-      addToast(result.error, 'error');
-      return;
-    }
-
-    await fetchGlobalTransactions();
-  };
-
-  const insertTransactions = async (newRows) => {
-    if (!user?.id) return;
-
-    const result = await invokeFinanceAction('insert_transactions', { rows: newRows });
-    if (result.error) {
-      addToast(result.error, 'error');
-      return;
-    }
-
-    await Promise.all([fetchTransactions(), fetchGlobalTransactions()]);
-  };
-
-  const addExpense = async (e) => {
-    e.preventDefault();
-    const name = e.target.name.value;
-    const amount = Number(e.target.amount.value);
-    const account = e.target.account.value;
-    const category = e.target.category.value;
-    const budgetMonth = e.target.budget_month.value;
-    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    
-    if (name && amount) {
-      setIsAddOpen(false);
-      await insertTransactions([{ name, amount, account, category, is_paid: true, date, budget_month: budgetMonth }]);
-    }
-  };
-
-  const addTopUp = async (e) => {
-    e.preventDefault();
-    const name = e.target.name.value;
-    const amount = Number(e.target.amount.value);
-    const account = e.target.account.value;
-    const budgetMonth = e.target.budget_month.value;
-    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    
-    if (name && amount) {
-      setIsTopUpOpen(false);
-      await insertTransactions([{ name, amount, account, category: 'Income', is_paid: true, date, budget_month: budgetMonth }]);
-    }
-  };
-
-  const addTransfer = async (e) => {
-    e.preventDefault();
-    const fromAcc = e.target.fromAcc.value;
-    const toAcc = e.target.toAcc.value;
-    const amount = Number(e.target.amount.value);
-    const budgetMonth = e.target.budget_month.value;
-    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-    if (fromAcc === toAcc) return addToast('Akun asal dan tujuan harus berbeda.', 'error');
-    if (amount > 0) {
-      setIsTransferOpen(false);
-      await insertTransactions([
-        { name: `Transfer to ${toAcc}`, amount, account: fromAcc, category: 'Transfer Out', is_paid: true, date, budget_month: budgetMonth },
-        { name: `Transfer from ${fromAcc}`, amount, account: toAcc, category: 'Transfer In', is_paid: true, date, budget_month: budgetMonth }
-      ]);
-    }
-  };
-
-  const removeTransaction = (id) => {
-    const deletedTx = transactions.find(tx => tx.id === id);
-    if (!deletedTx) return;
-
-    setTransactions(prev => prev.filter(tx => tx.id !== id));
-
-    if (pendingDeleteRef.current) {
-      clearTimeout(pendingDeleteRef.current.timer);
-      const prev = pendingDeleteRef.current;
-      invokeFinanceAction('delete_transaction', { transactionId: prev.id }).then(() => fetchGlobalTransactions());
-    }
-
-    const timer = setTimeout(async () => {
-      pendingDeleteRef.current = null;
-      const result = await invokeFinanceAction('delete_transaction', { transactionId: id });
-      if (result.error) {
-        addToast(result.error, 'error');
-        await fetchTransactions();
-      }
-      await fetchGlobalTransactions();
-    }, 8000);
-
-    pendingDeleteRef.current = { id, tx: deletedTx, timer };
-
-    addToast('"' + deletedTx.name + '" dihapus', 'undo', {
-      action: () => {
-        clearTimeout(timer);
-        pendingDeleteRef.current = null;
-        setTransactions(prev => [...prev, deletedTx].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date)));
-        addToast('Transaksi berhasil dikembalikan!', 'success');
-      },
-      actionLabel: 'Undo',
-      duration: 8000
-    });
-  };
-
-  const persistSettings = async (nextSettings) => {
-    if (!user?.id) return;
-
-    const result = await invokeFinanceAction('save_settings', {
-      settings: {
-        total_income: nextSettings.total_income,
-        accounts: nextSettings.accounts,
-        categories: nextSettings.categories,
-        goals: nextSettings.goals
-      }
-    });
-
-    if (result.error) console.error('Failed to save settings:', result.error);
-  };
-
-  // Edit transaction handler
-  const openEditTransaction = (tx) => { setEditingTransaction(tx); setIsEditOpen(true); };
-  const handleEditTransaction = async (e) => {
-    e.preventDefault();
-    if (!editingTransaction) return;
-    const name = e.target.name.value;
-    const amount = Number(String(e.target.amount.value).replace(/\D/g, '')) || Number(e.target.amount.value);
-    const account = e.target.account.value;
-    const category = e.target.category.value;
-    const budgetMonth = e.target.budget_month.value;
-    if (!name || !amount) return addToast('Nama dan jumlah wajib diisi.', 'error');
-    setIsEditOpen(false);
-    const result = await invokeFinanceAction('update_transaction', { transactionId: editingTransaction.id, updates: { name, amount, account, category, budget_month: budgetMonth } });
-    if (result.error) { addToast(result.error, 'error'); return; }
-    addToast('Transaksi berhasil diperbarui!', 'success');
-    await Promise.all([fetchTransactions(), fetchGlobalTransactions()]);
-    setEditingTransaction(null);
-  };
-
-  // Change credentials handler
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    setChangePasswordError('');
-    const currentVal = e.target.currentPassword.value;
-    const newVal = e.target.newPassword.value;
-    const confirmVal = e.target.confirmPassword.value;
-    if (newVal.length < 6) { setChangePasswordError('Minimal 6 karakter.'); return; }
-    if (newVal !== confirmVal) { setChangePasswordError('Konfirmasi tidak cocok.'); return; }
-    const currentHash = await hashPassword(currentVal);
-    const newHash = await hashPassword(newVal);
-    const sessionProof = getStoredSessionProof();
-    try {
-      const { data, error } = await supabase.functions.invoke('auth-session', {
-        body: { action: 'change_password', requesterId: user.id, sessionToken: sessionProof, currentPasswordHash: currentHash, newPasswordHash: newHash }
-      });
-      if (error || data?.error) { setChangePasswordError(data?.error || error?.message || 'Gagal mengubah.'); return; }
-      if (data?.data?.sessionToken) storeSessionProof(data.data.sessionToken, rememberMe);
-      setIsChangePasswordOpen(false);
-      addToast('Kredensial berhasil diubah!', 'success');
-    } catch { setChangePasswordError('Terjadi kesalahan koneksi.'); }
-  };
-
-  // Clear filters helper
-  const activeFilterCount = [filterCategory, filterAccount, filterType, filterStatus].filter(Boolean).length;
-  const clearAllFilters = () => { setFilterCategory(''); setFilterAccount(''); setFilterType(''); setFilterStatus(''); };
-
-  const saveSettings = async () => {
-    setIsSettingsOpen(false);
-    await persistSettings({
-      total_income: baseTotalIncome,
-      accounts,
-      categories,
-      goals
-    });
-  };
-
-  const quickAddGoalFund = (goalId, amountToAdd) => {
-    const amount = parseFloat(prompt('Berapa nominal (IDR) yang ingin ditambahkan ke tabungan impian ini?', amountToAdd || '0'));
-    if (!isNaN(amount) && amount > 0) {
-      const updatedGoals = goals.map(g => {
-        if (g.id === goalId) return { ...g, currentAmount: Number(g.currentAmount) + amount };
-        return g;
-      });
-      setGoals(updatedGoals);
-      persistSettings({
-        total_income: baseTotalIncome,
-        accounts,
-        categories,
-        goals: updatedGoals
-      });
-    }
-  };
-
-  const resetAdminFeedback = () => {
-    setAdminError('');
-    setAdminSuccess('');
-  };
-
-  const handleAdminUserSubmit = async (e) => {
-    e.preventDefault();
-    if (!isAdmin) return;
-
-    resetAdminFeedback();
-
-    const formData = new FormData(e.currentTarget);
-    const id = formData.get('id');
-    const username = String(formData.get('username') || '').trim();
-    const password = String(formData.get('password') || '').trim();
-    const role = String(formData.get('role') || 'user');
-
-    if (!username) {
-      setAdminError('Username wajib diisi.');
-      return;
-    }
-
-    if (!id && !password) {
-      setAdminError('Password wajib diisi untuk user baru.');
-      return;
-    }
-
-    const sessionProof = getStoredSessionProof();
-    if (!sessionProof) {
-      setAdminError('Sesi admin tidak ditemukan. Silakan login ulang.');
-      return;
-    }
-
-    const passwordHash = password ? await hashPassword(password) : null;
-
-    const { data, error } = await supabase.functions.invoke('admin-user-management', {
-      body: {
-        action: id ? 'update' : 'create',
-        requesterId: user.id,
-        sessionProof,
-        targetUserId: id || null,
-        username,
-        role,
-        passwordHash
-      }
-    });
-
-    if (error || data?.error) {
-      setAdminError(data?.error || error?.message || 'Gagal menyimpan user.');
-      return;
-    }
-
-    setAdminSuccess(id ? 'User berhasil diperbarui.' : 'User baru berhasil dibuat.');
-    setEditingAdminUserId(null);
-    await fetchAdminUsers();
-  };
-
-  const startEditAdminUser = (adminUser) => {
-    setEditingAdminUserId(adminUser.id);
-    resetAdminFeedback();
-  };
-
-  const cancelEditAdminUser = () => {
-    setEditingAdminUserId(null);
-    resetAdminFeedback();
-  };
-
-  const deleteAdminUser = async (id) => {
-    if (!isAdmin) return;
-    if (id === user.id) {
-      setAdminError('Admin yang sedang login tidak bisa menghapus akun sendiri.');
-      return;
-    }
-
-    resetAdminFeedback();
-    const confirmed = window.confirm('Hapus user ini dari sistem?');
-    if (!confirmed) return;
-
-    const sessionProof = getStoredSessionProof();
-    if (!sessionProof) {
-      setAdminError('Sesi admin tidak ditemukan. Silakan login ulang.');
-      return;
-    }
-
-    const { data, error } = await supabase.functions.invoke('admin-user-management', {
-      body: {
-        action: 'delete',
-        requesterId: user.id,
-        sessionProof,
-        targetUserId: id
-      }
-    });
-
-    if (error || data?.error) {
-      setAdminError(data?.error || error?.message || 'Gagal menghapus user.');
-      return;
-    }
-
-    setAdminSuccess('User berhasil dihapus.');
-    await fetchAdminUsers();
-  };
-
-  const exportToCSV = () => {
-    if (transactions.length === 0) return addToast('Tidak ada transaksi untuk diekspor.', 'warning');
-    const headers = ['ID', 'Date', 'Transaction Name', 'Amount (IDR)', 'Account', 'Category', 'Type', 'Status', 'Budget Month'];
-    const csvRows = [headers.join(',')];
-    transactions.forEach(tx => {
-      let type = 'Expense';
-      if (tx.category === 'Income') type = 'Income';
-      if (tx.category === 'Transfer In' || tx.category === 'Transfer Out') type = 'Internal Transfer';
-      const row = [tx.id, tx.date, `"${tx.name.replace(/"/g, '""')}"`, tx.amount, `"${tx.account}"`, `"${tx.category}"`, type, tx.isPaid ? 'Completed' : 'Pending', tx.budget_month || ''];
-      csvRows.push(row.join(','));
-    });
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.setAttribute('href', url); a.setAttribute('download', `AlkaFlow_Transactions_${viewMonthName.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
-
-  const filteredTransactions = useMemo(() => {
-    let result = transactions;
-    if (searchQuery.trim()) {
-      const lowerQ = searchQuery.toLowerCase();
-      result = result.filter(t => t.name.toLowerCase().includes(lowerQ) || t.category.toLowerCase().includes(lowerQ) || t.account.toLowerCase().includes(lowerQ));
-    }
-    if (filterCategory) result = result.filter(t => t.category === filterCategory);
-    if (filterAccount) result = result.filter(t => t.account === filterAccount);
-    if (filterType === 'income') result = result.filter(t => t.category === 'Income' || t.category === 'Transfer In');
-    else if (filterType === 'expense') result = result.filter(t => t.category !== 'Income' && !t.category.includes('Transfer'));
-    else if (filterType === 'transfer') result = result.filter(t => t.category.includes('Transfer'));
-    if (filterStatus === 'paid') result = result.filter(t => t.isPaid);
-    else if (filterStatus === 'unpaid') result = result.filter(t => !t.isPaid);
-    result = [...result].sort((a, b) => {
-      let cmp = 0;
-      if (sortBy === 'amount') cmp = Number(a.amount) - Number(b.amount);
-      else if (sortBy === 'name') cmp = (a.name || '').localeCompare(b.name || '');
-      else cmp = new Date(a.created_at || a.date) - new Date(b.created_at || b.date);
-      return sortOrder === 'asc' ? cmp : -cmp;
-    });
-    return result;
-  }, [transactions, searchQuery, filterCategory, filterAccount, filterType, filterStatus, sortBy, sortOrder]);
-
-  const groupedTransactions = useMemo(() => {
-    const groups = new Map();
-
-    filteredTransactions.forEach((transaction) => {
-      const transactionDate = parseTransactionDate(transaction);
-      const key = getPeriodKey(transactionDate, transactionGroupBy);
-      const type = getTransactionType(transaction);
-      const amount = Number(transaction.amount) || 0;
-
-      if (!groups.has(key)) {
-        groups.set(key, {
-          key,
-          date: transactionDate,
-          label: formatPeriodLabel(transactionDate, transactionGroupBy),
-          transactions: [],
-          income: 0,
-          expense: 0,
-          transfer: 0,
-          count: 0
-        });
-      }
-
-      const group = groups.get(key);
-      group.transactions.push(transaction);
-      group.count += 1;
-
-      if (type === 'income') group.income += amount;
-      else if (type === 'transfer') group.transfer += amount;
-      else group.expense += amount;
-    });
-
-    return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key));
-  }, [filteredTransactions, transactionGroupBy]);
-
-  const transactionChartData = useMemo(() => {
-    return [...groupedTransactions]
-      .reverse()
-      .map((group) => ({
-        label: group.label,
-        Income: group.income,
-        Expense: group.expense,
-        Net: group.income - group.expense
-      }));
-  }, [groupedTransactions]);
-
-  const transactionPeriodSummary = useMemo(() => {
-    return groupedTransactions.reduce((summary, group) => ({
-      income: summary.income + group.income,
-      expense: summary.expense + group.expense,
-      transfer: summary.transfer + group.transfer,
-      count: summary.count + group.count
-    }), { income: 0, expense: 0, transfer: 0, count: 0 });
-  }, [groupedTransactions]);
-
+  // Fetch telegram connections when profile view is active
   useEffect(() => {
-    if (!user || isAdmin || activeView !== 'profile') return;
+    if (!auth.user || auth.isAdmin || activeView !== 'profile') return;
     const handle = window.setTimeout(() => {
-      fetchTelegramConnections();
+      telegram.fetchTelegramConnections();
     }, 0);
-
     return () => window.clearTimeout(handle);
-  }, [activeView, fetchTelegramConnections, isAdmin, user]);
+  }, [activeView, auth.user, auth.isAdmin]);
 
-  const telegramStartLink = useMemo(() => {
-    if (!telegramLinkToken?.token) return '';
-    if (!TELEGRAM_BOT_USERNAME) return '';
-    return `tg://resolve?domain=${encodeURIComponent(TELEGRAM_BOT_USERNAME)}&start=${encodeURIComponent(telegramLinkToken.token)}`;
-  }, [telegramLinkToken]);
-
-  const telegramStartWebLink = useMemo(() => {
-    if (!telegramLinkToken?.token) return '';
-    if (!TELEGRAM_BOT_USERNAME) return '';
-    return `https://t.me/${encodeURIComponent(TELEGRAM_BOT_USERNAME)}?start=${encodeURIComponent(telegramLinkToken.token)}`;
-  }, [telegramLinkToken]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const buildQrCode = async () => {
-      if (!telegramLinkToken?.token) {
-        setTelegramQrCode('');
-        return;
-      }
-
-      try {
-        const qrValue = telegramStartLink || telegramLinkToken.token;
-        const url = await QRCode.toDataURL(qrValue, {
-          width: 280,
-          margin: 1,
-          color: {
-            dark: '#213f31',
-            light: '#ffffff'
-          }
-        });
-
-        if (!cancelled) setTelegramQrCode(url);
-      } catch {
-        if (!cancelled) setTelegramQrCode('');
-      }
-    };
-
-    buildQrCode();
-    return () => {
-      cancelled = true;
-    };
-  }, [telegramLinkToken, telegramStartLink]);
-
-  const totals = useMemo(() => {
-    const incomes = transactions.filter(t => t.category === 'Income');
-    const expenses = transactions.filter(t => t.category !== 'Income' && !t.category.includes('Transfer'));
-    const totalDynamicIncome = incomes.reduce((sum, inc) => sum + Number(inc.amount), 0);
-    const allocated = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
-    const categoryTotals = {};
-    categories.forEach(c => categoryTotals[c.name] = 0);
-    expenses.forEach(exp => {
-      if (categoryTotals[exp.category] !== undefined) categoryTotals[exp.category] += Number(exp.amount);
-      else categoryTotals[exp.category] = Number(exp.amount); 
-    });
-    return { totalDynamicIncome, allocated, categoryTotals, incomes, expenses };
-  }, [transactions, categories]);
-
-  const effectiveTotalIncome = baseTotalIncome + totals.totalDynamicIncome;
-  const currentAccountBalances = useMemo(() => {
-    const current = {};
-    accounts.forEach(a => current[a.name] = Number(a.balance));
-    globalTransactions.forEach(tx => {
-      if(current[tx.account] !== undefined) {
-        if (tx.category === 'Income' || tx.category === 'Transfer In') current[tx.account] += Number(tx.amount);
-        else if (tx.is_paid) current[tx.account] -= Number(tx.amount);
-      }
-    });
-    return current;
-  }, [globalTransactions, accounts]);
-
-  const sumOfAccounts = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
-  const sumOfCategories = categories.reduce((sum, cat) => sum + Number(cat.targetPercentage), 0);
-  const usagePercentage = effectiveTotalIncome > 0 ? ((totals.allocated / effectiveTotalIncome) * 100).toFixed(1) : 0;
-  const totalBalance = Object.values(currentAccountBalances).reduce((a, b) => a + b, 0);
-
-  const donutChartData = categories.map((cat, i) => ({
-    name: cat.name, value: totals.categoryTotals[cat.name] || 0, color: CHART_COLORS[i % CHART_COLORS.length]
-  })).filter(d => d.value > 0); 
-
-  const budgetAlerts = useMemo(() => {
-    return categories.map(cat => {
-      const spent = totals.categoryTotals[cat.name] || 0;
-      const target = (cat.targetPercentage / 100) * effectiveTotalIncome;
-      const percent = target > 0 ? (spent / target) * 100 : 0;
-      return { name: cat.name, spent, target, percent, status: percent >= 100 ? 'over' : percent >= 80 ? 'warning' : 'ok' };
-    });
-  }, [categories, totals, effectiveTotalIncome]);
-
-  // Show budget alert toasts on data load
+  // Budget alert toasts
   const budgetAlertShownRef = useRef(false);
   useEffect(() => {
-    if (!user || isAdmin || budgetAlerts.length === 0 || isLoading) return;
+    if (!auth.user || auth.isAdmin || finance.budgetAlerts.length === 0 || auth.isLoading) return;
     if (budgetAlertShownRef.current) return;
-    const alerts = budgetAlerts.filter(a => a.status === 'over' || a.status === 'warning');
+    const alerts = finance.budgetAlerts.filter(a => a.status === 'over' || a.status === 'warning');
     if (alerts.length > 0) {
       budgetAlertShownRef.current = true;
       alerts.slice(0, 3).forEach((a, i) => {
@@ -1109,1378 +116,233 @@ function App() {
         }, (i + 1) * 800);
       });
     }
-  }, [budgetAlerts, user, isAdmin, isLoading, addToast]);
+  }, [finance.budgetAlerts, auth.user, auth.isAdmin, auth.isLoading, addToast]);
 
-  const unpaidCount = useMemo(() => transactions.filter(t => !t.isPaid && t.category !== 'Income' && !t.category.includes('Transfer')).length, [transactions]);
+  // Logout handler that also resets local state
+  const handleLogout = async () => {
+    await auth.handleLogout();
+    setActiveView('home');
+    admin.setAdminUsers([]);
+    admin.setEditingAdminUserId(null);
+    admin.setAdminError('');
+    admin.setAdminSuccess('');
+    finance.setBaseTotalIncome(0);
+    finance.setAccounts([]);
+    finance.setCategories([]);
+    finance.setGoals([]);
+    finance.setTransactions([]);
+    finance.setGlobalTransactions([]);
+  };
 
-  const notifications = useMemo(() => {
-    const items = [];
-    budgetAlerts.forEach(a => {
-      if (a.status === 'over') items.push({ id: 'budget-over-' + a.name, type: 'danger', title: a.name + ' Over Budget!', desc: 'Pengeluaran ' + a.percent.toFixed(0) + '% dari budget (' + formatIDR(a.spent) + ' / ' + formatIDR(a.target) + ')' });
-      else if (a.status === 'warning') items.push({ id: 'budget-warn-' + a.name, type: 'warning', title: a.name + ' Hampir Limit', desc: 'Sudah ' + a.percent.toFixed(0) + '% dari budget (' + formatIDR(a.spent) + ' / ' + formatIDR(a.target) + ')' });
-    });
-    if (unpaidCount > 0) items.push({ id: 'unpaid', type: 'info', title: unpaidCount + ' Transaksi Belum Dibayar', desc: 'Ada transaksi yang belum ditandai sebagai paid.' });
-    goals.forEach(goal => {
-      const pct = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
-      if (pct >= 100) items.push({ id: 'goal-done-' + goal.id, type: 'success', title: goal.name + ' Tercapai!', desc: 'Selamat! Target tabungan sudah terpenuhi.' });
-      else if (pct >= 75) items.push({ id: 'goal-75-' + goal.id, type: 'info', title: goal.name + ' ' + pct.toFixed(0) + '%', desc: 'Hampir mencapai target tabungan!' });
-    });
-    return items;
-  }, [budgetAlerts, unpaidCount, goals]);
+  // Export CSV helper
+  const exportToCSV = () => exportTransactionsToCSV(finance.transactions, finance.viewMonthName, addToast);
 
-  const renderTelegramProfilePanel = () => (
-    <div className="widget-card telegram-profile-card">
-      <div className="widget-header" style={{marginBottom:'1rem'}}>
-        <span className="widget-title">Telegram Integration</span>
-        <button type="button" className="btn-primary" onClick={fetchTelegramConnections} disabled={isTelegramLoading} style={{color:'white'}}>
-          Refresh
-        </button>
-      </div>
+  // Form handlers that bridge modals to finance actions
+  const handleAddExpense = async (e) => {
+    e.preventDefault();
+    const name = e.target.name.value;
+    const amount = Number(e.target.amount.value);
+    const account = e.target.account.value;
+    const category = e.target.category.value;
+    const budgetMonth = e.target.budget_month.value;
+    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (name && amount) {
+      setIsAddOpen(false);
+      await finance.insertTransactions([{ name, amount, account, category, is_paid: true, date, budget_month: budgetMonth }]);
+    }
+  };
 
-      <div className="telegram-settings-card">
-        <div>
-          <div className="telegram-settings-title">Hubungkan Telegram</div>
-          <div className="telegram-settings-copy">
-            Generate token lalu scan QR untuk menghubungkan akun Telegram Anda.
-          </div>
-        </div>
-        <button type="button" className="btn-primary" onClick={generateTelegramLinkToken} disabled={isTelegramLoading} style={{color:'white'}}>
-          {isTelegramLoading ? 'Memproses...' : 'Generate Token'}
-        </button>
-      </div>
+  const handleAddTopUp = async (e) => {
+    e.preventDefault();
+    const name = e.target.name.value;
+    const amount = Number(e.target.amount.value);
+    const account = e.target.account.value;
+    const budgetMonth = e.target.budget_month.value;
+    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (name && amount) {
+      setIsTopUpOpen(false);
+      await finance.insertTransactions([{ name, amount, account, category: 'Income', is_paid: true, date, budget_month: budgetMonth }]);
+    }
+  };
 
-      {telegramError && (
-        <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
-          {telegramError}
-        </div>
-      )}
+  const handleAddTransfer = async (e) => {
+    e.preventDefault();
+    const fromAcc = e.target.fromAcc.value;
+    const toAcc = e.target.toAcc.value;
+    const amount = Number(e.target.amount.value);
+    const budgetMonth = e.target.budget_month.value;
+    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (fromAcc === toAcc) return addToast('Akun asal dan tujuan harus berbeda.', 'error');
+    if (amount > 0) {
+      setIsTransferOpen(false);
+      await finance.insertTransactions([
+        { name: `Transfer to ${toAcc}`, amount, account: fromAcc, category: 'Transfer Out', is_paid: true, date, budget_month: budgetMonth },
+        { name: `Transfer from ${fromAcc}`, amount, account: toAcc, category: 'Transfer In', is_paid: true, date, budget_month: budgetMonth }
+      ]);
+    }
+  };
 
-      {telegramSuccess && (
-        <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
-          {telegramSuccess}
-        </div>
-      )}
-
-      {telegramLinkToken && (
-        <div className="telegram-token-box">
-          <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginBottom:'0.4rem'}}>Token aktif</div>
-          <div className="telegram-token-value">{telegramLinkToken.token}</div>
-          <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.5rem'}}>
-            Berlaku sampai {new Date(telegramLinkToken.expires_at).toLocaleString('id-ID')}
-          </div>
-          {telegramQrCode && (
-            <div className="telegram-qr-section">
-              <div className="telegram-qr-card">
-                <img src={telegramQrCode} alt="QR code untuk menghubungkan Telegram" className="telegram-qr-image" />
-              </div>
-              <div style={{fontSize:'0.9rem', color:'var(--text-secondary)', lineHeight:'1.5'}}>
-                {telegramStartLink ? (
-                  <>
-                    Scan QR ini untuk membuka Telegram dan melanjutkan proses koneksi.
-                    <div style={{marginTop:'0.5rem', wordBreak:'break-all'}}>
-                      <a href={telegramStartWebLink} target="_blank" rel="noreferrer" style={{color:'var(--accent-dark-green)', fontWeight:'600'}}>
-                        Buka Telegram
-                      </a>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    QR siap dipakai untuk proses koneksi Telegram.
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="telegram-settings-card" style={{marginTop:'1rem'}}>
-        <div>
-          <div className="telegram-settings-title">Koneksi Saat Ini</div>
-          <div className="telegram-settings-copy">
-            Daftar akun Telegram yang sudah terhubung ke akun ini.
-          </div>
-        </div>
-      </div>
-
-      {isTelegramLoading && telegramConnections.length === 0 ? (
-        <div style={{color:'var(--text-secondary)', marginTop:'1rem'}}>Memuat koneksi Telegram...</div>
-      ) : telegramConnections.length === 0 ? (
-        <div className="telegram-empty-state">
-          Belum ada koneksi Telegram.
-        </div>
-      ) : (
-        <div style={{display:'flex', flexDirection:'column', gap:'0.75rem', marginTop:'1rem'}}>
-          {telegramConnections.map((connection) => (
-            <div key={connection.id} className="telegram-connection-item">
-              <div>
-                <div style={{display:'flex', alignItems:'center', gap:'0.5rem', flexWrap:'wrap'}}>
-                  <strong>{connection.label || `Chat ${connection.telegram_chat_id}`}</strong>
-                  {connection.is_primary && <span className="telegram-badge">Primary</span>}
-                  {connection.is_verified && <span className="telegram-badge telegram-badge-success">Verified</span>}
-                </div>
-                <div style={{fontSize:'0.85rem', color:'var(--text-secondary)', marginTop:'0.35rem'}}>
-                  chat_id: {connection.telegram_chat_id} • type: {connection.chat_type}
-                </div>
-                <div style={{fontSize:'0.8rem', color:'var(--text-secondary)', marginTop:'0.25rem'}}>
-                  Terhubung {new Date(connection.linked_at || connection.created_at).toLocaleString('id-ID')}
-                </div>
-              </div>
-              <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap', justifyContent:'flex-end'}}>
-                {!connection.is_primary && (
-                  <button type="button" className="btn-primary" style={{color:'white', padding:'0.65rem 0.9rem'}} onClick={() => setPrimaryTelegramConnection(connection.id)}>
-                    Jadikan Primary
-                  </button>
-                )}
-                <button type="button" className="btn-danger" style={{padding:'0.65rem 0.9rem'}} onClick={() => unlinkTelegramConnection(connection.id)}>
-                  <Trash2 size={16} /> Unlink
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  // ==========================================
-  // RENDER BLOCKS
-  // ==========================================
-
-  if (!user) {
-    return (
-      <div className="login-screen">
-        <div className="login-shell">
-          <section className="login-card">
-            <div className="login-card-header">
-              <div className="login-brand-mark compact">
-                <div className="login-brand-orbit" aria-hidden="true">
-                  <div className="login-brand-orbit-ring"></div>
-                  <div className="login-brand-orbit-ring secondary"></div>
-                  <div className="login-brand-orbit-core">
-                    <AlkaFlowLogoMark size={58} />
-                  </div>
-                </div>
-              </div>
-              <AlkaFlowWordmark compact />
-              <p className="login-brand-tagline compact">TRACK YOUR MONEY. EFFORTLESSLY.</p>
-              <h1 className="login-title">Welcome back</h1>
-              <p className="login-subtitle">Sign in to continue.</p>
-            </div>
-
-            <form onSubmit={handleLogin}>
-              {loginError && (<div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>{loginError}</div>)}
-              <div style={{marginBottom:'1.5rem', textAlign:'left'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Username</label>
-                <input type="text" name="username" required className="form-input login-input" placeholder="Enter username" />
-              </div>
-              <div style={{marginBottom:'2rem', textAlign:'left'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Password</label>
-                <input type="password" name="password" required className="form-input login-input" placeholder="••••••••" />
-              </div>
-              <label className="login-remember">
-                <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-                Remember me
-              </label>
-              <button type="submit" className="btn-primary login-submit" style={{width:'100%', padding:'1rem'}}>Sign In to AlkaFlow</button>
-            </form>
-          </section>
-        </div>
-      </div>
-    );
+  // Login screen
+  if (!auth.user) {
+    return <LoginScreen loginError={auth.loginError} rememberMe={auth.rememberMe} setRememberMe={auth.setRememberMe} handleLogin={auth.handleLogin} />;
   }
 
-  // 1. DESKTOP VIEW
-  const renderDesktopView = () => (
-    <>
-      <aside className="sidebar">
-        <div>
-          <div className="logo"><div className="logo-icon">AF</div> AlkaFlow</div>
-          <div className="nav-links">
-            {isAdmin ? (
-              <div className={`nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}><Users size={20} /> User Management</div>
-            ) : (
-              <>
-                <div className={`nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}><Home size={20} /> Home</div>
-                <div className={`nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => { setActiveView('transactions'); setSearchQuery(''); }}><CreditCard size={20} /> Transactions</div>
-                <div className={`nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}><User size={20} /> Profile</div>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="sidebar-bottom">
-          <div className="profile-widget">
-            <div className="profile-avatar">
-              <div style={{width:'100%', height:'100%', background:'var(--accent-lime)', color:'#0f172a', display:'grid', placeContent:'center', fontWeight:'700'}}>{getInitial(user.name)}</div>
-            </div>
-            <div className="profile-info">
-              <div className="profile-name">{user.name}</div>
-              <div className="profile-role">{user.role}</div>
-            </div>
-            <div style={{position:'relative'}}>
-              <div style={{cursor:'pointer',position:'relative'}} onClick={() => setIsNotificationOpen(!isNotificationOpen)}>
-                <Bell size={18} color="var(--text-secondary)" />
-                {notifications.filter(n => !readNotifications.has(n.id)).length > 0 && <span className="notification-badge">{notifications.filter(n => !readNotifications.has(n.id)).length}</span>}
-              </div>
-              {isNotificationOpen && (
-                <>
-                  <div className="notification-panel-overlay" onClick={() => setIsNotificationOpen(false)} />
-                  <div className="notification-panel">
-                    <div className="notification-panel-header">
-                      <h3>Notifikasi</h3>
-                      <button onClick={() => { setReadNotifications(new Set(notifications.map(n => n.id))); }}>Tandai semua dibaca</button>
-                    </div>
-                    {notifications.length === 0 ? <div className="notification-empty">Tidak ada notifikasi</div> : notifications.map(n => (
-                      <div key={n.id} className={`notification-item ${readNotifications.has(n.id) ? '' : 'unread'}`} onClick={() => setReadNotifications(prev => new Set([...prev, n.id]))}>
-                        <div className={`notification-icon ${n.type}`}><AlertTriangle size={18} /></div>
-                        <div className="notification-content">
-                          <div className="notification-title">{n.title}</div>
-                          <div className="notification-desc">{n.desc}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-          {!isAdmin && (
-            <>
-              <div className="total-balance">
-                <div className="total-balance-label">Total Balance</div>
-                <div className="total-balance-value">{formatIDR(totalBalance)}</div>
-              </div>
-              <button className="btn-lime"><QrCode size={20} /> Scan QR</button>
-            </>
-          )}
-          {isAdmin && <button className="btn-danger" onClick={handleLogout}><LogOut size={18}/> Logout</button>}
-        </div>
-      </aside>
+  // Shared view props
+  const viewProps = {
+    isMobile,
+    accounts: finance.accounts,
+    categories: finance.categories,
+    goals: finance.goals,
+    filteredTransactions: finance.filteredTransactions,
+    groupedTransactions: finance.groupedTransactions,
+    transactionChartData: finance.transactionChartData,
+    transactionPeriodSummary: finance.transactionPeriodSummary,
+    totalBalance: finance.totalBalance,
+    currentAccountBalances: finance.currentAccountBalances,
+    effectiveTotalIncome: finance.effectiveTotalIncome,
+    totals: finance.totals,
+    donutChartData: finance.donutChartData,
+    usagePercentage: finance.usagePercentage,
+    viewMonthName: finance.viewMonthName,
+    timelineMonths: finance.timelineMonths,
+    monthOffset: finance.monthOffset,
+    setMonthOffset: finance.setMonthOffset,
+    transactionGroupBy: finance.transactionGroupBy,
+    setTransactionGroupBy: finance.setTransactionGroupBy,
+    filterCategory: finance.filterCategory, setFilterCategory: finance.setFilterCategory,
+    filterAccount: finance.filterAccount, setFilterAccount: finance.setFilterAccount,
+    filterType: finance.filterType, setFilterType: finance.setFilterType,
+    filterStatus: finance.filterStatus, setFilterStatus: finance.setFilterStatus,
+    sortBy: finance.sortBy, setSortBy: finance.setSortBy,
+    sortOrder: finance.sortOrder, setSortOrder: finance.setSortOrder,
+    activeFilterCount: finance.activeFilterCount, clearAllFilters: finance.clearAllFilters,
+    togglePaid: finance.togglePaid,
+    removeTransaction: finance.removeTransaction,
+    openEditTransaction: finance.openEditTransaction,
+    quickAddGoalFund: finance.quickAddGoalFund,
+    setIsAddOpen, setIsTopUpOpen, setIsTransferOpen,
+    setIsSettingsOpen, setSettingsTab,
+    setActiveView,
+    exportToCSV,
+  };
 
-      <main className="main-content">
-        <div className="top-bar">
-          <div className="page-title">
-            {activeView === 'home' && `Overview - ${viewMonthName}`}
-            {activeView === 'transactions' && `Transactions for ${viewMonthName}`}
-            {activeView === 'admin' && 'AlkaFlow Admin'}
-            {activeView === 'profile' && `Your Account`}
-          </div>
-          <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
-            <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={toggleTheme}>
-              {isDarkMode ? <Sun size={20}/> : <Moon size={20}/>}
-            </button>
-            {!isAdmin && (
-              <>
-                <div className="search-bar">
-                  <Search size={18} color="var(--text-secondary)"/>
-                  <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => {setSearchQuery(e.target.value); if(activeView!=='transactions') setActiveView('transactions');}}/>
-                </div>
-                <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={() => setIsSettingsOpen(true)}>
-                  <Settings size={20} />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+  const renderActiveView = () => {
+    if (auth.isLoading) {
+      return <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'50vh', color:'var(--text-secondary)'}}>{auth.isAdmin ? 'Loading admin data...' : `Loading ${finance.viewMonthName} data...`}</div>;
+    }
 
-        {isLoading ? (
-           <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'50vh', color:'var(--text-secondary)'}}>{isAdmin ? 'Loading admin data...' : `Loading ${viewMonthName} data...`}</div>
-        ) : activeView === 'home' ? (
-          <>
-            <div className="hero-card">
-              <div className="hero-card-pattern"></div>
-              <div className="hero-card-copy">
-                <div className="hero-card-eyebrow">AlkaFlow</div>
-                <h2 className="hero-card-title">Your Financial Flow</h2>
-                <p className="hero-card-subtitle">Track income and expenses automatically from Telegram.</p>
-              </div>
-              <div className="hero-card-metric">
-                <div className="hero-card-metric-label">Total Balance</div>
-                <div className="hero-card-metric-value">{formatIDR(totalBalance)}</div>
-                <div className="hero-card-metric-trend">+5.8% this month</div>
-              </div>
-            </div>
-
-            <div className="money-overview-card" style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'2rem', color:'white', marginBottom:'1.5rem', display:'flex', gap:'2rem', alignItems:'center', flexWrap:'wrap'}}>
-               <div style={{flex:1, minWidth:'250px'}}>
-                 <h3 style={{fontSize:'1.5rem', fontWeight:'700', marginBottom:'0.5rem', letterSpacing:'-0.02em'}}>Money Overview</h3>
-                 <p className="money-overview-subtitle">Total Pool: {formatIDR(effectiveTotalIncome)}</p>
-               </div>
-               <div className="money-overview-timeline" style={{display:'flex', gap:'1rem'}}>
-                 {timelineMonths.map((item, i) => {
-                    const isCurrent = item.offset === monthOffset;
-                    return (
-                      <div key={`month-${i}`} onClick={() => setMonthOffset(item.offset)} style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'0.5rem', cursor: 'pointer'}}>
-                        <div style={{
-                          width: isCurrent ? '80px' : '50px', height: '40px', background: isCurrent ? 'var(--accent-lime)' : 'rgba(255,255,255,0.08)', 
-                          borderRadius: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: isCurrent ? '#0f172a' : 'white', fontWeight: isCurrent ? '600' : '400', transition: 'all 0.3s ease'
-                        }}>{isCurrent ? `${usagePercentage}%` : ''}</div>
-                        <span style={{ fontSize:'0.8rem', opacity: isCurrent ? 1 : 0.6, fontWeight: isCurrent ? '600' : '400', color: isCurrent ? 'var(--accent-lime)' : 'white' }}>{item.label}</span>
-                      </div>
-                    )
-                 })}
-               </div>
-            </div>
-
-            <div className="dashboard-grid">
-              <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
-                <div className="widget-card" style={{padding:'1.5rem'}}>
-                  <div className="widget-header">
-                    <span className="widget-title">My Accounts</span>
-                    <a href="#" className="see-all">See all ›</a>
-                  </div>
-                  <div className="cards-container">
-                    {accounts.length === 0 && <span style={{color:'var(--text-secondary)'}}>No accounts yet.</span>}
-                    {accounts.map((acc, index) => (
-                      <div key={acc.id} className={`bank-card color-${index % 4} ${index === 0 ? 'bank-card-primary' : index === 1 ? 'bank-card-accent' : 'bank-card-muted'}`}>
-                        <div style={{display:'flex', justifyContent:'space-between'}}>
-                          <span className="bank-card-type">{acc.name}</span>
-                          <span style={{fontWeight:'700', fontStyle:'italic'}}>BANK</span>
-                        </div>
-                        <div className="bank-card-number">**** {String(acc.balance).substring(0,4)}</div>
-                        <div className="bank-card-bottom">
-                          <div>
-                            <div className="bank-card-valid">Valid</div>
-                            <div style={{fontSize:'0.9rem'}}>12/28</div>
-                          </div>
-                          <div className="bank-card-balance">{formatIDR(currentAccountBalances[acc.name])}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'1.5rem'}}>
-                  <div className="widget-card action-panel-card">
-                    <div className="widget-header"><span className="widget-title">Actions</span></div>
-                    <div className="actions-grid">
-                      <button className="action-btn" onClick={() => setIsAddOpen(true)}>
-                        <div className="action-icon"><Plus size={20} color="var(--accent-dark-green)"/></div> Add Exp.
-                      </button>
-                      <button className="action-btn" onClick={() => setIsTopUpOpen(true)}>
-                        <div className="action-icon"><ArrowUpRight size={20} color="var(--success)"/></div> Top Up
-                      </button>
-                      <button className="action-btn" onClick={() => setIsTransferOpen(true)}>
-                        <div className="action-icon"><ArrowRightLeft size={20} color="var(--accent-blue-gray)"/></div> Transfer
-                      </button>
-                      <button className="action-btn" onClick={exportToCSV}>
-                        <div className="action-icon"><Download size={20} color="var(--accent-dark-green)"/></div> Export
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="widget-card">
-                    <div className="widget-header">
-                      <span className="widget-title">Recent Transactions</span>
-                      <a href="#" className="see-all" onClick={(e) => {e.preventDefault(); setActiveView('transactions');}}>See all ›</a>
-                    </div>
-                    <div className="transaction-list">
-                      {filteredTransactions.length === 0 && <span style={{color:'var(--text-secondary)'}}>No transactions found.</span>}
-                      {filteredTransactions.slice(0, 4).map((tx, i) => (
-                        <div key={tx.id} className="transaction-item transaction-item-card">
-                          <div className="transaction-left">
-                            <div className="transaction-avatar" style={{background: tx.category === 'Income' ? 'var(--success)' : tx.category.includes('Transfer') ? 'var(--accent-blue-gray)' : `hsl(${i * 60 + 10}, 70%, 50%)`}}>
-                              {getInitial(tx.name.replace('Transfer to ', '').replace('Transfer from ', ''))}
-                            </div>
-                            <div className="transaction-details">
-                              <span className={`transaction-name ${tx.isPaid && !tx.category.includes('Transfer') && tx.category !== 'Income' ? 'paid' : ''}`}>{tx.name}</span>
-                              <span className="transaction-date">{tx.date} &bull; {tx.account}</span>
-                            </div>
-                          </div>
-                          <div className="transaction-right">
-                            <div className={`transaction-amount ${tx.category === 'Income' || tx.category === 'Transfer In' ? 'income' : 'expense'}`}>
-                              {tx.category === 'Income' || tx.category === 'Transfer In' ? '+' : '-'} {formatIDR(tx.amount)}
-                            </div>
-                            <div className="transaction-category">{tx.category}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
-                <div className="widget-card">
-                  <div className="widget-header">
-                    <span className="widget-title">Savings Goals</span>
-                    <button className="see-all" onClick={() => { setIsSettingsOpen(true); setSettingsTab('goals'); }} style={{background:'none', border:'none'}}><Plus size={16}/> Add Goal</button>
-                  </div>
-                  <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
-                    {goals.length === 0 ? (<span style={{color:'var(--text-secondary)', fontSize:'0.9rem'}}>No savings goals yet.</span>) : (
-                      goals.map((goal, i) => {
-                        const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
-                        const isComplete = percent >= 100;
-                        return (
-                          <div key={goal.id}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'0.5rem'}}>
-                              <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
-                                <div style={{width:'36px', height:'36px', borderRadius:'10px', background: isComplete ? 'var(--success)' : 'var(--bg-input)', display:'grid', placeContent:'center', color: isComplete ? 'white' : CHART_COLORS[i % CHART_COLORS.length]}}>
-                                  {isComplete ? <CheckCircle2 size={18}/> : <Target size={18}/>}
-                                </div>
-                                <div>
-                                  <div style={{fontWeight:'600', fontSize:'0.95rem'}}>{goal.name}</div>
-                                  <div style={{fontSize:'0.75rem', color:'var(--text-secondary)'}}>{formatIDR(goal.currentAmount)} / {formatIDR(goal.targetAmount)}</div>
-                                </div>
-                              </div>
-                              <div style={{textAlign:'right'}}>
-                                <div style={{fontWeight:'700', fontSize:'1.1rem', color: isComplete ? 'var(--success)' : 'inherit'}}>{percent.toFixed(0)}%</div>
-                                {!isComplete && (<button onClick={() => quickAddGoalFund(goal.id)} style={{background:'none', border:'none', color:'var(--accent-blue-gray)', fontSize:'0.75rem', fontWeight:'600', cursor:'pointer', padding:'0.25rem 0'}}>+ Add Fund</button>)}
-                              </div>
-                            </div>
-                            <div style={{height:'8px', background:'var(--bg-input)', borderRadius:'4px', overflow:'hidden'}}>
-                              <div style={{height:'100%', width:`${percent}%`, background: isComplete ? 'var(--success)' : CHART_COLORS[i % CHART_COLORS.length], borderRadius:'4px'}}></div>
-                            </div>
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
-                </div>
-
-                <div className="widget-card chart-card" style={{display:'flex', flexDirection:'column', justifyContent:'center'}}>
-                  <div className="widget-header" style={{marginBottom:'0.5rem'}}>
-                    <span className="widget-title" style={{color:'var(--text-secondary)', fontWeight:'500'}}>Total Allocated</span>
-                    <div style={{background:'var(--danger-light)', padding:'0.5rem', borderRadius:'50%'}}><ArrowDownRight size={16} color="var(--danger)"/></div>
-                  </div>
-                  {donutChartData.length > 0 ? (
-                    <div style={{ height: '200px', width: '100%', marginTop: '1rem', marginBottom: '1rem' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={donutChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
-                            {donutChartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
-                          </Pie>
-                          <RechartsTooltip formatter={(value) => formatIDR(value)} contentStyle={{ borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}/>
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (<div style={{ height: '200px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-secondary)', fontSize:'0.9rem' }}>No spending yet</div>)}
-                  <div className="spending-amount" style={{textAlign:'center'}}>{formatIDR(totals.allocated)}</div>
-                  <div className="spending-trend" style={{textAlign:'center'}}>{usagePercentage}% of Pool</div>
-                </div>
-
-                <div className="widget-card">
-                  <div className="widget-header"><span className="widget-title">Budget Categories</span></div>
-                  <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
-                    {categories.length === 0 && <span style={{color:'var(--text-secondary)'}}>No categories yet.</span>}
-                    {categories.map((cat, i) => {
-                      const amount = totals.categoryTotals[cat.name] || 0;
-                      const targetAmount = (cat.targetPercentage / 100) * effectiveTotalIncome;
-                      const percent = targetAmount > 0 ? (amount / targetAmount) * 100 : 0;
-                      return (
-                        <div key={cat.id} style={{display:'flex', alignItems:'center', gap:'1rem'}}>
-                          <div style={{width:'40px', height:'40px', borderRadius:'50%', background:CHART_COLORS[i % CHART_COLORS.length], color: i===0?'black':'white', display:'grid', placeContent:'center', fontWeight:'600'}}>
-                            {getInitial(cat.name)}
-                          </div>
-                          <div style={{flex:1}}>
-                            <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.9rem', marginBottom:'0.25rem'}}>
-                              <span style={{fontWeight:'500'}}>{cat.name} ({cat.targetPercentage}%)</span>
-                              <span>{formatIDR(amount)}</span>
-                            </div>
-                            <div style={{height:'6px', background:'var(--bg-input)', borderRadius:'3px', overflow:'hidden'}}>
-                              <div style={{height:'100%', width:`${Math.min(percent, 100)}%`, background:CHART_COLORS[i % CHART_COLORS.length]}}></div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        ) : activeView === 'transactions' ? (
-          <div className="transactions-workspace">
-            <section className="widget-card transactions-list-panel">
-              <div className="widget-header transactions-toolbar">
-                <div>
-                  <span className="widget-title">Transactions List ({filteredTransactions.length})</span>
-                  <div className="transactions-toolbar-subtitle">{groupedTransactions.length} periode di {viewMonthName}</div>
-                </div>
-                <div className="transactions-toolbar-actions">
-                  <div className="period-toggle" aria-label="Group transactions">
-                    {[
-                      { value: 'day', label: 'Harian' },
-                      { value: 'week', label: 'Mingguan' },
-                      { value: 'month', label: 'Bulanan' }
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={transactionGroupBy === option.value ? 'active' : ''}
-                        onClick={() => setTransactionGroupBy(option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <button className="btn-primary" onClick={() => setIsTransferOpen(true)} style={{background:'var(--accent-blue-gray)', color: '#fff'}}><ArrowRightLeft size={16}/> Transfer</button>
-                  <button className="btn-primary" onClick={() => setIsAddOpen(true)} style={{color: '#fff'}}><Plus size={16}/> Add Expense</button>
-                  <button className="btn-primary" style={{background:'var(--success)', color: '#fff'}} onClick={() => setIsTopUpOpen(true)}><ArrowUpRight size={16}/> Top Up</button>
-                </div>
-              </div>
-
-              <div className="filter-bar">
-                <select className={`filter-select ${filterCategory ? 'active' : ''}`} value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
-                  <option value="">Semua Kategori</option>
-                  {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  <option value="Income">Income</option>
-                </select>
-                <select className={`filter-select ${filterAccount ? 'active' : ''}`} value={filterAccount} onChange={e => setFilterAccount(e.target.value)}>
-                  <option value="">Semua Akun</option>
-                  {accounts.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
-                </select>
-                <select className={`filter-select ${filterType ? 'active' : ''}`} value={filterType} onChange={e => setFilterType(e.target.value)}>
-                  <option value="">Semua Tipe</option>
-                  <option value="income">Income</option>
-                  <option value="expense">Expense</option>
-                  <option value="transfer">Transfer</option>
-                </select>
-                <select className={`filter-select ${filterStatus ? 'active' : ''}`} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                  <option value="">Semua Status</option>
-                  <option value="paid">Paid</option>
-                  <option value="unpaid">Unpaid</option>
-                </select>
-                <div className="sort-toggle">
-                  {['date','amount','name'].map(s => <button key={s} className={sortBy === s ? 'active' : ''} onClick={() => { setSortBy(s); setSortOrder(prev => sortBy === s ? (prev === 'desc' ? 'asc' : 'desc') : 'desc'); }}>{s === 'date' ? 'Tanggal' : s === 'amount' ? 'Nominal' : 'Nama'}{sortBy === s ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}</button>)}
-                </div>
-                {activeFilterCount > 0 && <button className="filter-clear-btn" onClick={clearAllFilters}><X size={14}/> Reset ({activeFilterCount})</button>}
-              </div>
-
-              {groupedTransactions.length === 0 ? (
-                <div className="transactions-empty-state">Belum ada transaksi untuk filter ini.</div>
-              ) : (
-                <div className="transactions-group-list">
-                  {groupedTransactions.map((group) => (
-                    <section className="transaction-period-group" key={group.key}>
-                      <div className="transaction-period-header">
-                        <div>
-                          <h3>{group.label}</h3>
-                          <span>{group.count} transaksi</span>
-                        </div>
-                        <div className="transaction-period-totals">
-                          <span className="income">+ {formatIDR(group.income)}</span>
-                          <span className="expense">- {formatIDR(group.expense)}</span>
-                        </div>
-                      </div>
-                      <table className="full-transactions-table">
-                        <thead>
-                          <tr><th style={{width:'60px'}}>Status</th><th>Date</th><th>Name</th><th>Account</th><th>Category</th><th style={{textAlign:'right'}}>Amount</th><th style={{width:'60px'}}></th></tr>
-                        </thead>
-                        <tbody>
-                          {group.transactions.map(tx => (
-                            <tr key={tx.id}>
-                              <td>{tx.category === 'Income' || tx.category.includes('Transfer') ? <CheckCircle2 size={16} color="var(--success)"/> : <input type="checkbox" className="custom-checkbox" checked={tx.isPaid} onChange={() => togglePaid(tx.id, tx.isPaid)} />}</td>
-                              <td style={{color:'var(--text-secondary)'}}>{tx.date}</td>
-                              <td>{tx.name}</td>
-                              <td>{tx.account}</td>
-                              <td>{tx.category}</td>
-                              <td style={{textAlign:'right', color: tx.category === 'Income' || tx.category === 'Transfer In' ? 'var(--success)' : 'inherit'}}>{formatIDR(tx.amount)}</td>
-                              <td style={{textAlign:'right'}}><div style={{display:'inline-flex', gap:'0.35rem'}}><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent-blue-gray)'}} onClick={() => openEditTransaction(tx)}><Pencil size={16}/></button><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)'}} onClick={() => removeTransaction(tx.id)}><Trash2 size={18}/></button></div></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </section>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <aside className="transactions-chart-panel">
-              <div className="widget-card">
-                <div className="widget-header">
-                  <span className="widget-title">Cashflow Chart</span>
-                  <button type="button" className="see-all" onClick={exportToCSV} style={{background:'none', border:'none'}}>
-                    <Download size={16} /> Export
-                  </button>
-                </div>
-                <div className="transactions-chart-summary">
-                  <div>
-                    <span>Income</span>
-                    <strong className="income">{formatIDR(transactionPeriodSummary.income)}</strong>
-                  </div>
-                  <div>
-                    <span>Expense</span>
-                    <strong className="expense">{formatIDR(transactionPeriodSummary.expense)}</strong>
-                  </div>
-                  <div>
-                    <span>Net</span>
-                    <strong>{formatIDR(transactionPeriodSummary.income - transactionPeriodSummary.expense)}</strong>
-                  </div>
-                </div>
-                <div className="transactions-chart">
-                  {transactionChartData.length === 0 ? (
-                    <div className="transactions-empty-state compact">Tidak ada data grafik.</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={transactionChartData} margin={{ top: 8, right: 8, left: -18, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} axisLine={false} />
-                        <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-                        <RechartsTooltip formatter={(value) => formatIDR(value)} />
-                        <Bar dataKey="Income" fill="var(--success)" radius={[6, 6, 0, 0]} />
-                        <Bar dataKey="Expense" fill="var(--danger)" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
-
-              <div className="widget-card transactions-breakdown-card">
-                <div className="widget-header">
-                  <span className="widget-title">Period Breakdown</span>
-                </div>
-                <div className="transactions-breakdown-list">
-                  {groupedTransactions.slice(0, 6).map((group) => {
-                    const total = group.income + group.expense || 1;
-                    const expensePercent = Math.round((group.expense / total) * 100);
-
-                    return (
-                      <div className="transactions-breakdown-item" key={group.key}>
-                        <div>
-                          <strong>{group.label}</strong>
-                          <span>{group.count} transaksi</span>
-                        </div>
-                        <div className="transactions-breakdown-bar">
-                          <span style={{width: `${expensePercent}%`}}></span>
-                        </div>
-                        <small>{formatIDR(group.expense)} expense</small>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </aside>
-          </div>
-        ) : activeView === 'admin' ? (
-          <div style={{display:'grid', gridTemplateColumns:'1.1fr 1.4fr', gap:'1.5rem'}}>
-            <div className="widget-card" style={{alignSelf:'start'}}>
-              <div className="widget-header" style={{marginBottom:'1rem'}}>
-                <span className="widget-title">{editingAdminUserId ? 'Edit User' : 'Create User'}</span>
-              </div>
-              {adminError && <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminError}</div>}
-              {adminSuccess && <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminSuccess}</div>}
-              <form onSubmit={handleAdminUserSubmit} key={editingAdminUserId || 'new-user-form'}>
-                <input type="hidden" name="id" defaultValue={editingAdminUserId || ''} />
-                <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
-                  <div>
-                    <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Username</label>
-                    <input
-                      type="text"
-                      name="username"
-                      className="form-input"
-                      defaultValue={editingAdminUserId ? adminUsers.find((item) => item.id === editingAdminUserId)?.username || '' : ''}
-                      placeholder="Masukkan username"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>
-                      Password {editingAdminUserId ? '(kosongkan jika tidak diubah)' : ''}
-                    </label>
-                    <input type="password" name="password" className="form-input" placeholder={editingAdminUserId ? 'Biarkan kosong jika tetap sama' : 'Masukkan password'} />
-                  </div>
-                  <div>
-                    <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Role</label>
-                    <select
-                      name="role"
-                      className="form-input"
-                      defaultValue={editingAdminUserId ? adminUsers.find((item) => item.id === editingAdminUserId)?.role || 'user' : 'user'}
-                    >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </div>
-                  <button type="submit" className="btn-primary" style={{width:'100%', color:'#fff'}}>
-                    {editingAdminUserId ? 'Update User' : 'Create User'}
-                  </button>
-                  {editingAdminUserId && (
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      onClick={cancelEditAdminUser}
-                      style={{justifyContent:'center'}}
-                    >
-                      Cancel Edit
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-
-            <div className="widget-card">
-              <div className="widget-header" style={{borderBottom:'1px solid var(--border-color)', paddingBottom:'1rem', marginBottom:'1rem'}}>
-                <span className="widget-title">User Management ({adminUsers.length})</span>
-                <button className="see-all" onClick={fetchAdminUsers} style={{background:'none', border:'none'}}>Refresh</button>
-              </div>
-              <table className="full-transactions-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Role</th>
-                    <th style={{textAlign:'right'}}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {adminUsers.map((adminUser) => (
-                    <tr key={adminUser.id}>
-                      <td style={{color:'var(--text-secondary)'}}>{adminUser.id}</td>
-                      <td>{adminUser.username}</td>
-                      <td style={{textTransform:'capitalize'}}>{adminUser.role || 'user'}</td>
-                      <td style={{textAlign:'right'}}>
-                        <div style={{display:'inline-flex', gap:'0.5rem'}}>
-                          <button className="btn-primary" type="button" onClick={() => startEditAdminUser(adminUser)} style={{padding:'0.6rem 0.9rem', color:'#fff'}}>Edit</button>
-                          <button className="btn-danger" type="button" onClick={() => deleteAdminUser(adminUser.id)}>
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {adminUsers.length === 0 && (
-                    <tr>
-                      <td colSpan="4" style={{textAlign:'center', color:'var(--text-secondary)', padding:'1.5rem'}}>Belum ada user.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : activeView === 'profile' ? (
-          <div style={{display:'flex', flexDirection:'column', gap:'1.5rem', maxWidth:'860px', margin:'0 auto'}}>
-            <div className="widget-card" style={{textAlign:'center', padding:'3rem'}}>
-              <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
-              <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
-              <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
-            </div>
-            {renderTelegramProfilePanel()}
-          </div>
-        ) : null}
-      </main>
-    </>
-  );
-
-  // 2. MOBILE VIEW (MOCKUP STYLE)
-  const renderMobileView = () => (
-    <>
-      <main className="main-content">
-        <div className="mobile-header">
-          <div className="mobile-profile">
-            <div className="profile-avatar" style={{width:'48px', height:'48px', borderRadius:'50%', border:'2px solid var(--accent-lime)'}}>
-              <div style={{width:'100%', height:'100%', background:'var(--bg-main)', color:'var(--text-primary)', display:'grid', placeContent:'center', fontWeight:'700', fontSize:'1.2rem'}}>
-                {getInitial(user.name)}
-              </div>
-            </div>
-            <span className="mobile-profile-name">{user.name}</span>
-          </div>
-          <div style={{display:'flex', gap:'0.5rem'}}>
-             <button style={{background:'var(--bg-card)', border:'none', width:'48px', height:'48px', borderRadius:'50%', display:'grid', placeContent:'center'}} onClick={toggleTheme}>
-               {isDarkMode ? <Sun size={20} color="var(--text-primary)"/> : <Moon size={20} color="var(--text-primary)"/>}
-             </button>
-             {!isAdmin && (
-               <button className="mobile-bell">
-                 <Bell size={20} color="var(--text-primary)"/>
-                 <span className="notification-dot"></span>
-               </button>
-             )}
-          </div>
-        </div>
-
-        {isLoading ? (
-           <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'50vh', color:'var(--text-secondary)'}}>Loading...</div>
-        ) : activeView === 'home' ? (
-          <>
-            <div className="mobile-balance">
-              <div style={{color:'var(--text-secondary)', fontSize:'0.9rem', marginBottom:'0.25rem'}}>Total Balance</div>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                <div style={{fontSize:'2.5rem', fontWeight:'800', color:'var(--text-primary)', letterSpacing:'-1px'}}>{formatIDR(totalBalance)}</div>
-                <Eye size={24} color="var(--text-secondary)"/>
-              </div>
-            </div>
-
-            <div className="cards-container" style={{margin:'1rem 0 2rem 0'}}>
-              {accounts.map((acc, index) => (
-                <div key={acc.id} className={`bank-card color-${index % 4}`}>
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                    <span className="bank-card-type">Debit</span>
-                    <span style={{fontWeight:'800', fontSize:'1.2rem', letterSpacing:'1px'}}>VISA</span>
-                  </div>
-                  <div className="chip-icon" style={{margin:'1.5rem 0'}}>
-                    <div className="dots-row"><span></span><span></span></div>
-                    <div className="dots-row"><span></span><span></span></div>
-                  </div>
-                  <div className="bank-card-bottom" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
-                    <div>
-                      <div style={{fontSize:'0.65rem', opacity:0.8, marginBottom:'0.2rem'}}>Card Number</div>
-                      <div className="bank-card-number">**** **** **** {String(acc.balance).substring(0,4)}</div>
-                    </div>
-                    <div style={{textAlign:'right'}}>
-                      <div style={{fontSize:'0.65rem', opacity:0.8, marginBottom:'0.2rem'}}>Valid</div>
-                      <div style={{fontSize:'0.9rem', fontWeight:'600'}}>07/30</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="dashboard-grid">
-              <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
-                <div className="mobile-actions-row">
-                  <div className="mobile-action-item" onClick={() => setIsTopUpOpen(true)}>
-                    <div className="mobile-action-squircle"><Download size={24} color="var(--text-primary)"/></div><span>Top Up</span>
-                  </div>
-                  <div className="mobile-action-item" onClick={() => setIsAddOpen(true)}>
-                    <div className="mobile-action-squircle"><ArrowUpRight size={24} color="var(--text-primary)"/></div><span>Send</span>
-                  </div>
-                  <div className="mobile-action-item" onClick={() => setIsTransferOpen(true)}>
-                    <div className="mobile-action-squircle"><CreditCard size={24} color="var(--text-primary)"/></div><span>Pay</span>
-                  </div>
-                  <div className="mobile-action-item" onClick={exportToCSV}>
-                    <div className="mobile-action-squircle"><ArrowRightLeft size={24} color="var(--text-primary)"/></div><span>Transfer</span>
-                  </div>
-                </div>
-
-                <div className="promo-banner">
-                  <div className="promo-icon"><CreditCard size={20} color="white"/></div>
-                  <div>
-                    <div className="promo-title">Telegram Auto Tracking</div>
-                    <div className="promo-subtitle">Track your finances as easily as sending a message.</div>
-                  </div>
-                  <div className="promo-arrow"><ChevronRight size={20}/></div>
-                </div>
-
-                <div style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'1.5rem', color:'white', marginTop:'1rem'}}>
-                   <h3 style={{fontSize:'1.2rem', fontWeight:'500', marginBottom:'1rem'}}>Timeline ({usagePercentage}%)</h3>
-                   <div style={{display:'flex', gap:'1rem', overflowX:'auto'}}>
-                     {timelineMonths.map((item, i) => {
-                        const isCurrent = item.offset === monthOffset;
-                        return (
-                          <div key={`month-${i}`} onClick={() => setMonthOffset(item.offset)} style={{
-                            padding:'0.5rem 1rem', background: isCurrent ? 'var(--accent-lime)' : 'rgba(255,255,255,0.08)', 
-                            borderRadius: '20px', color: isCurrent ? '#0f172a' : 'white', fontWeight: isCurrent ? '600' : '400', cursor:'pointer'
-                          }}>{item.label}</div>
-                        )
-                     })}
-                   </div>
-                </div>
-
-                <div className="transaction-list" style={{marginTop:'1rem'}}>
-                    {filteredTransactions.slice(0, 5).map((tx, i) => (
-                      <div key={tx.id} className="transaction-item" style={{background:'var(--bg-card)', padding:'1rem', borderRadius:'16px'}}>
-                        <div className="transaction-left">
-                          <div className="transaction-avatar" style={{background: tx.category === 'Income' ? 'var(--success)' : tx.category.includes('Transfer') ? 'var(--accent-blue-gray)' : `hsl(${i * 60 + 10}, 70%, 50%)`}}>
-                            {getInitial(tx.name.replace('Transfer to ', '').replace('Transfer from ', ''))}
-                          </div>
-                          <div className="transaction-details">
-                            <span className="transaction-name" style={{color:'var(--text-primary)'}}>{tx.name}</span>
-                            <span className="transaction-date">{tx.date}</span>
-                          </div>
-                        </div>
-                        <div className="transaction-right">
-                          <div className={`transaction-amount ${tx.category === 'Income' || tx.category === 'Transfer In' ? 'income' : 'expense'}`}>
-                            {tx.category === 'Income' || tx.category === 'Transfer In' ? '+' : '-'} {formatIDR(tx.amount)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          </>
-        ) : activeView === 'transactions' ? (
-          <div className="mobile-transactions-page">
-             <div className="mobile-transactions-header">
-               <div>
-                 <h2 className="mobile-transactions-title">Transactions</h2>
-                 <p className="mobile-transactions-subtitle">{filteredTransactions.length} transaksi di {viewMonthName}</p>
-               </div>
-               <button type="button" className="mobile-transactions-export" onClick={exportToCSV}>
-                 <Download size={18} />
-                 Export
-               </button>
-             </div>
-
-             <div className="mobile-transaction-actions">
-               <button type="button" className="mobile-transaction-action action-income" onClick={() => setIsTopUpOpen(true)}>
-                 <ArrowUpRight size={18} />
-                 Top Up
-               </button>
-               <button type="button" className="mobile-transaction-action action-expense" onClick={() => setIsAddOpen(true)}>
-                 <Plus size={18} />
-                 Expense
-               </button>
-               <button type="button" className="mobile-transaction-action action-transfer" onClick={() => setIsTransferOpen(true)}>
-                 <ArrowRightLeft size={18} />
-                 Transfer
-               </button>
-             </div>
-
-             <div className="mobile-transactions-list">
-               {filteredTransactions.length === 0 ? (
-                 <div className="mobile-transactions-empty">Belum ada transaksi di periode ini.</div>
-               ) : (
-                 filteredTransactions.map((tx, i) => (
-                   <article key={tx.id} className="mobile-transaction-card">
-                     <div className="mobile-transaction-main">
-                       <div
-                         className="transaction-avatar"
-                         style={{
-                           background:
-                             tx.category === 'Income'
-                               ? 'var(--success)'
-                               : tx.category.includes('Transfer')
-                                 ? 'var(--accent-blue-gray)'
-                                 : `hsl(${i * 60 + 10}, 70%, 50%)`
-                         }}
-                       >
-                         {getInitial(tx.name.replace('Transfer to ', '').replace('Transfer from ', ''))}
-                       </div>
-                       <div className="mobile-transaction-copy">
-                         <div className="mobile-transaction-topline">
-                           <span className={`transaction-name ${tx.isPaid ? 'paid' : ''}`}>{tx.name}</span>
-                           <span className={`transaction-amount ${tx.category === 'Income' || tx.category === 'Transfer In' ? 'income' : 'expense'}`}>
-                             {tx.category === 'Income' || tx.category === 'Transfer In' ? '+' : '-'} {formatIDR(tx.amount)}
-                           </span>
-                         </div>
-                         <div className="mobile-transaction-meta">
-                           <span>{tx.date}</span>
-                           <span>{tx.account}</span>
-                           <span>{tx.category}</span>
-                         </div>
-                       </div>
-                     </div>
-                     <div className="mobile-transaction-controls">
-                       {tx.category === 'Income' || tx.category.includes('Transfer') ? (
-                         <span className="mobile-transaction-status success">
-                           <CheckCircle2 size={16} />
-                           Completed
-                         </span>
-                       ) : (
-                         <label className="mobile-transaction-toggle">
-                           <input
-                             type="checkbox"
-                             className="custom-checkbox"
-                             checked={tx.isPaid}
-                             onChange={() => togglePaid(tx.id, tx.isPaid)}
-                           />
-                           <span>{tx.isPaid ? 'Paid' : 'Mark paid'}</span>
-                         </label>
-                       )}
-                       <button
-                         type="button"
-                         className="mobile-transaction-delete"
-                         onClick={() => removeTransaction(tx.id)}
-                         aria-label={`Delete ${tx.name}`}
-                       >
-                         <Trash2 size={16} />
-                       </button>
-                     </div>
-                   </article>
-                 ))
-               )}
-             </div>
-          </div>
-        ) : activeView === 'admin' ? (
-           <div style={{display:'flex', flexDirection:'column', gap:'1rem', paddingBottom:'2rem'}}>
-             <div className="widget-card">
-               <h2 style={{fontSize:'1.4rem', fontWeight:'700', marginBottom:'0.5rem'}}>AlkaFlow Admin</h2>
-               <p style={{color:'var(--text-secondary)', marginBottom:'1rem'}}>Kelola user aplikasi dari satu tempat dengan kontrol yang rapi dan aman.</p>
-               {adminError && <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminError}</div>}
-               {adminSuccess && <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>{adminSuccess}</div>}
-               <form onSubmit={handleAdminUserSubmit} key={editingAdminUserId || 'mobile-new-user-form'} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
-                 <input type="hidden" name="id" defaultValue={editingAdminUserId || ''} />
-                 <input type="text" name="username" className="form-input" placeholder="Username" defaultValue={editingAdminUserId ? adminUsers.find((item) => item.id === editingAdminUserId)?.username || '' : ''} required />
-                 <input type="password" name="password" className="form-input" placeholder={editingAdminUserId ? 'Password baru (opsional)' : 'Password'} />
-                 <select name="role" className="form-input" defaultValue={editingAdminUserId ? adminUsers.find((item) => item.id === editingAdminUserId)?.role || 'user' : 'user'}>
-                   <option value="user">User</option>
-                   <option value="admin">Admin</option>
-                 </select>
-                 <button type="submit" className="btn-primary" style={{color:'#fff'}}>{editingAdminUserId ? 'Update User' : 'Create User'}</button>
-               </form>
-             </div>
-             <div className="widget-card">
-               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
-                 <h3 style={{fontSize:'1rem', fontWeight:'600'}}>User List</h3>
-                 <button type="button" className="see-all" onClick={fetchAdminUsers} style={{background:'none', border:'none'}}>Refresh</button>
-               </div>
-               <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
-                 {adminUsers.map((adminUser) => (
-                   <div key={adminUser.id} style={{background:'var(--hover-bg)', padding:'1rem', borderRadius:'12px'}}>
-                     <div style={{fontWeight:'600'}}>{adminUser.username}</div>
-                     <div style={{color:'var(--text-secondary)', fontSize:'0.85rem', marginTop:'0.25rem'}}>ID {adminUser.id} • {(adminUser.role || 'user').toUpperCase()}</div>
-                     <div style={{display:'flex', gap:'0.5rem', marginTop:'0.75rem'}}>
-                       <button type="button" className="btn-primary" onClick={() => startEditAdminUser(adminUser)} style={{color:'#fff', padding:'0.6rem 0.9rem'}}>Edit</button>
-                       <button type="button" className="btn-danger" onClick={() => deleteAdminUser(adminUser.id)}><Trash2 size={16}/></button>
-                     </div>
-                   </div>
-                 ))}
-                 {adminUsers.length === 0 && <div style={{color:'var(--text-secondary)'}}>Belum ada user.</div>}
-               </div>
-             </div>
-           </div>
-        ) : activeView === 'profile' ? (
-           <div style={{display:'flex', flexDirection:'column', gap:'1rem', paddingBottom:'2rem'}}>
-             <div className="widget-card" style={{textAlign:'center'}}>
-               <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
-               <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
-               <button className="btn-danger" onClick={handleLogout} style={{marginTop:'2rem'}}><LogOut size={18}/> Logout</button>
-             </div>
-             {renderTelegramProfilePanel()}
-           </div>
-        ) : null}
-      </main>
-
-      <div className="mobile-bottom-nav">
-        {isAdmin ? (
-          <>
-            <div className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}>
-              <Users size={24} /> <span>Users</span>
-            </div>
-            <div className="mobile-nav-fab" onClick={handleLogout}>
-               <LogOut size={24} color="#0f172a" />
-            </div>
-            <div className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}>
-              <Settings size={24} /> <span>Admin</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className={`mobile-nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}>
-              <Home size={24} /> <span>Home</span>
-            </div>
-            <div className={`mobile-nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => setActiveView('transactions')}>
-              <ArrowRightLeft size={24} /> <span>Trans</span>
-            </div>
-            
-            <div className="mobile-nav-fab" onClick={() => setIsTopUpOpen(true)}>
-               <QrCode size={26} color="#0f172a" />
-            </div>
-
-            <div className={`mobile-nav-item`} onClick={() => setIsSettingsOpen(true)}>
-              <CreditCard size={24} /> <span>Cards</span>
-            </div>
-            <div className={`mobile-nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}>
-              <User size={24} /> <span>Profile</span>
-            </div>
-          </>
-        )}
-      </div>
-    </>
-  );
-
-  const renderSettingsModal = () => (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <div className="modal-header">
-          <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Settings</h2>
-          <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsSettingsOpen(false)}><X size={24}/></button>
-        </div>
-        <div className="tabs" style={{overflowX: 'auto', whiteSpace: 'nowrap'}}>
-          <div className={`tab ${settingsTab === 'accounts' ? 'active' : ''}`} onClick={() => setSettingsTab('accounts')}>Accounts</div>
-          <div className={`tab ${settingsTab === 'categories' ? 'active' : ''}`} onClick={() => setSettingsTab('categories')}>Budgets</div>
-          <div className={`tab ${settingsTab === 'goals' ? 'active' : ''}`} onClick={() => setSettingsTab('goals')}>Goals</div>
-        </div>
-        
-        {settingsTab === 'accounts' && (
-          <div>
-             <div style={{marginBottom: '1.5rem'}}>
-              <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Income Bulanan (IDR)</label>
-              <FormattedNumberInput value={baseTotalIncome} onChange={(num) => setBaseTotalIncome(num)} />
-              <div style={{marginTop: '0.5rem', fontSize: '0.85rem', color: sumOfAccounts !== baseTotalIncome ? 'var(--danger)' : 'var(--success)'}}>
-                Total akun: {formatIDR(sumOfAccounts)}
-              </div>
-            </div>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
-              <h3 style={{fontSize:'1rem', fontWeight:'600'}}>Base Accounts Setup</h3>
-              <button style={{background:'var(--accent-lime)', color:'#0f172a', border:'none', padding:'0.5rem', borderRadius:'8px', cursor:'pointer'}} 
-                      onClick={() => setAccounts([...accounts, { id: `acc-${Date.now()}`, name: 'New Account', balance: 0 }])}><Plus size={16}/></button>
-            </div>
-            {accounts.map(acc => (
-              <div style={{display:'flex', gap:'0.5rem', marginBottom:'0.5rem'}} key={acc.id}>
-                <input type="text" className="form-input" value={acc.name} onChange={(e) => setAccounts(accounts.map(a => a.id === acc.id ? { ...a, name: e.target.value } : a))} placeholder="Account Name"/>
-                <FormattedNumberInput value={acc.balance} onChange={(num) => setAccounts(accounts.map(a => a.id === acc.id ? { ...a, balance: num } : a))} placeholder="Initial Balance"/>
-                <button className="btn-danger" onClick={() => setAccounts(accounts.filter(a => a.id !== acc.id))}><Trash2 size={20}/></button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {settingsTab === 'categories' && (
-          <div>
-            <div style={{marginBottom: '1.5rem'}}>
-              <div style={{fontSize: '0.9rem', color: sumOfCategories !== 100 ? 'var(--danger)' : 'var(--success)'}}>Total alokasi: {sumOfCategories}%</div>
-            </div>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
-              <h3 style={{fontSize:'1rem', fontWeight:'600'}}>Categories Setup</h3>
-              <button style={{background:'var(--accent-lime)', color:'#0f172a', border:'none', padding:'0.5rem', borderRadius:'8px', cursor:'pointer'}} 
-                      onClick={() => setCategories([...categories, { id: `cat-${Date.now()}`, name: 'New Category', targetPercentage: 0 }])}><Plus size={16}/></button>
-            </div>
-            {categories.map(cat => (
-              <div style={{display:'flex', gap:'0.5rem', marginBottom:'0.5rem'}} key={cat.id}>
-                <input type="text" className="form-input" value={cat.name} onChange={(e) => setCategories(categories.map(c => c.id === cat.id ? { ...c, name: e.target.value } : c))} placeholder="Category Name"/>
-                <input type="number" className="form-input" value={cat.targetPercentage} onChange={(e) => setCategories(categories.map(c => c.id === cat.id ? { ...c, targetPercentage: Number(e.target.value) } : c))} placeholder="Percentage (e.g. 20)"/>
-                <button className="btn-danger" onClick={() => setCategories(categories.filter(c => c.id !== cat.id))}><Trash2 size={20}/></button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {settingsTab === 'goals' && (
-          <div>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
-              <h3 style={{fontSize:'1rem', fontWeight:'600'}}>Savings Goals Setup</h3>
-              <button style={{background:'var(--accent-lime)', color:'#0f172a', border:'none', padding:'0.5rem', borderRadius:'8px', cursor:'pointer'}} 
-                      onClick={() => setGoals([...goals, { id: `goal-${Date.now()}`, name: 'New Goal', targetAmount: 10000000, currentAmount: 0 }])}><Plus size={16}/></button>
-            </div>
-            {goals.map(goal => (
-              <div style={{background: 'var(--hover-bg)', padding:'1rem', borderRadius:'12px', marginBottom:'1rem'}} key={goal.id}>
-                <div style={{display:'flex', gap:'0.5rem', marginBottom:'0.5rem'}}>
-                  <input type="text" className="form-input" value={goal.name} onChange={(e) => setGoals(goals.map(g => g.id === goal.id ? { ...g, name: e.target.value } : g))} placeholder="Goal Name"/>
-                  <button className="btn-danger" onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}><Trash2 size={20}/></button>
-                </div>
-                <div style={{display:'flex', gap:'0.5rem'}}>
-                  <div style={{flex:1}}>
-                    <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Terkumpul</label>
-                    <FormattedNumberInput value={goal.currentAmount} onChange={(num) => setGoals(goals.map(g => g.id === goal.id ? { ...g, currentAmount: num } : g))} placeholder="0"/>
-                  </div>
-                  <div style={{flex:1}}>
-                    <label style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>Target</label>
-                    <FormattedNumberInput value={goal.targetAmount} onChange={(num) => setGoals(goals.map(g => g.id === goal.id ? { ...g, targetAmount: num } : g))} placeholder="1000000"/>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button className="btn-primary" style={{width: '100%', marginTop:'2rem', padding:'1rem', color:'white'}} onClick={saveSettings}>Save to Supabase</button>
-      </div>
-    </div>
-  );
+    switch (activeView) {
+      case 'home': return <HomeView {...viewProps} />;
+      case 'transactions': return <TransactionsView {...viewProps} />;
+      case 'admin': return (
+        <AdminView
+          isMobile={isMobile}
+          adminUsers={admin.adminUsers}
+          editingAdminUserId={admin.editingAdminUserId}
+          adminError={admin.adminError}
+          adminSuccess={admin.adminSuccess}
+          handleAdminUserSubmit={admin.handleAdminUserSubmit}
+          startEditAdminUser={admin.startEditAdminUser}
+          cancelEditAdminUser={admin.cancelEditAdminUser}
+          deleteAdminUser={admin.deleteAdminUser}
+          fetchAdminUsers={admin.fetchAdminUsers}
+        />
+      );
+      case 'profile': return (
+        <ProfileView
+          isMobile={isMobile}
+          user={auth.user}
+          handleLogout={handleLogout}
+          telegramProps={telegram}
+        />
+      );
+      default: return null;
+    }
+  };
 
   return (
     <div className="app-layout">
-      {isMobile ? renderMobileView() : renderDesktopView()}
-
-      {/* MODALS (Shared across both views) */}
-      {!isAdmin && isAddOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Add New Expense</h2>
-              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsAddOpen(false)}><X size={24}/></button>
-            </div>
-            <form onSubmit={addExpense}>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Budget Month (Alokasi Kantong)</label>
-                <select name="budget_month" className="form-input" required defaultValue={activeBudgetMonth}>
-                  {timelineMonths.map(m => <option key={m.budgetMonthValue} value={m.budgetMonthValue}>{m.label} ({m.budgetMonthValue})</option>)}
-                </select>
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Expense Name</label>
-                <input type="text" name="name" className="form-input" placeholder="e.g. Internet Bill" required />
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Amount (IDR)</label>
-                <FormattedNumberInput name="amount" placeholder="0" required />
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Account</label>
-                <select name="account" className="form-input" required>
-                  {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
-                </select>
-              </div>
-              <div style={{marginBottom:'1.5rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Category</label>
-                <select name="category" className="form-input" required>
-                  {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                </select>
-              </div>
-              <button type="submit" className="btn-primary" style={{width: '100%', color: 'white'}}>Add Expense</button>
-            </form>
-          </div>
-        </div>
+      {isMobile ? (
+        <>
+          <main className="main-content">
+            <MobileHeader user={auth.user} isAdmin={auth.isAdmin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} setIsNotificationOpen={setIsNotificationOpen} />
+            {renderActiveView()}
+          </main>
+          <MobileBottomNav
+            isAdmin={auth.isAdmin} activeView={activeView} setActiveView={setActiveView}
+            handleLogout={handleLogout} fetchAdminUsers={admin.fetchAdminUsers}
+            setIsTopUpOpen={setIsTopUpOpen} setIsSettingsOpen={setIsSettingsOpen}
+          />
+        </>
+      ) : (
+        <>
+          <Sidebar
+            user={auth.user} isAdmin={auth.isAdmin} activeView={activeView} setActiveView={setActiveView}
+            totalBalance={finance.totalBalance} notifications={finance.notifications}
+            readNotifications={readNotifications} setReadNotifications={setReadNotifications}
+            handleLogout={handleLogout} fetchAdminUsers={admin.fetchAdminUsers}
+          />
+          <main className="main-content">
+            <TopBar
+              activeView={activeView} viewMonthName={finance.viewMonthName} isAdmin={auth.isAdmin}
+              searchQuery={finance.searchQuery} setSearchQuery={finance.setSearchQuery} setActiveView={setActiveView}
+              isDarkMode={isDarkMode} toggleTheme={toggleTheme} setIsSettingsOpen={setIsSettingsOpen}
+            />
+            {renderActiveView()}
+          </main>
+        </>
       )}
 
-      {!isAdmin && isTopUpOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Top Up / Add Income</h2>
-              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsTopUpOpen(false)}><X size={24}/></button>
-            </div>
-            <form onSubmit={addTopUp}>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Budget Month</label>
-                <select name="budget_month" className="form-input" required defaultValue={activeBudgetMonth}>
-                  {timelineMonths.map(m => <option key={m.budgetMonthValue} value={m.budgetMonthValue}>{m.label} ({m.budgetMonthValue})</option>)}
-                </select>
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Income Source Name</label>
-                <input type="text" name="name" className="form-input" placeholder="e.g. Bonus Bulanan, Jualan" required />
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Amount (IDR)</label>
-                <FormattedNumberInput name="amount" placeholder="0" required />
-              </div>
-              <div style={{marginBottom:'1.5rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Deposit To Account</label>
-                <select name="account" className="form-input" required>
-                  {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
-                </select>
-              </div>
-              <button type="submit" className="btn-primary" style={{width: '100%', background:'var(--success)', color: 'white'}}>Add Income</button>
-            </form>
-          </div>
-        </div>
+      {/* Modals */}
+      {!auth.isAdmin && isAddOpen && (
+        <AddExpenseModal accounts={finance.accounts} categories={finance.categories} timelineMonths={finance.timelineMonths} activeBudgetMonth={finance.activeBudgetMonth} onSubmit={handleAddExpense} onClose={() => setIsAddOpen(false)} />
       )}
-
-      {!isAdmin && isTransferOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Transfer Funds</h2>
-              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsTransferOpen(false)}><X size={24}/></button>
-            </div>
-            <form onSubmit={addTransfer}>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Budget Month</label>
-                <select name="budget_month" className="form-input" required defaultValue={activeBudgetMonth}>
-                  {timelineMonths.map(m => <option key={m.budgetMonthValue} value={m.budgetMonthValue}>{m.label} ({m.budgetMonthValue})</option>)}
-                </select>
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Amount (IDR)</label>
-                <FormattedNumberInput name="amount" placeholder="0" required />
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>From Account</label>
-                <select name="fromAcc" className="form-input" required>
-                  {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
-                </select>
-              </div>
-              <div style={{marginBottom:'1.5rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>To Account</label>
-                <select name="toAcc" className="form-input" required>
-                  {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
-                </select>
-              </div>
-              <button type="submit" className="btn-primary" style={{width: '100%', background:'var(--accent-blue-gray)', color: 'white'}}>Transfer</button>
-            </form>
-          </div>
-        </div>
+      {!auth.isAdmin && isTopUpOpen && (
+        <TopUpModal accounts={finance.accounts} timelineMonths={finance.timelineMonths} activeBudgetMonth={finance.activeBudgetMonth} onSubmit={handleAddTopUp} onClose={() => setIsTopUpOpen(false)} />
       )}
-
-      {!isAdmin && isSettingsOpen && renderSettingsModal()}
-
-      {/* Edit Transaction Modal */}
-      {isEditOpen && editingTransaction && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Edit Transaksi</h2>
-              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => { setIsEditOpen(false); setEditingTransaction(null); }}><X size={24}/></button>
-            </div>
-            <form onSubmit={handleEditTransaction}>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Budget Month</label>
-                <select name="budget_month" className="form-input" required defaultValue={editingTransaction.budget_month || activeBudgetMonth}>
-                  {timelineMonths.map(m => <option key={m.budgetMonthValue} value={m.budgetMonthValue}>{m.label} ({m.budgetMonthValue})</option>)}
-                </select>
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Nama Transaksi</label>
-                <input type="text" name="name" className="form-input" defaultValue={editingTransaction.name} required />
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Jumlah (IDR)</label>
-                <FormattedNumberInput name="amount" defaultValue={editingTransaction.amount} required />
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Akun</label>
-                <select name="account" className="form-input" required defaultValue={editingTransaction.account}>
-                  {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
-                </select>
-              </div>
-              <div style={{marginBottom:'1.5rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Kategori</label>
-                <select name="category" className="form-input" required defaultValue={editingTransaction.category}>
-                  <option value="Income">Income</option>
-                  <option value="Transfer In">Transfer In</option>
-                  <option value="Transfer Out">Transfer Out</option>
-                  {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                </select>
-              </div>
-              <button type="submit" className="btn-primary" style={{width:'100%', color:'white'}}>Simpan Perubahan</button>
-            </form>
-          </div>
-        </div>
+      {!auth.isAdmin && isTransferOpen && (
+        <TransferModal accounts={finance.accounts} timelineMonths={finance.timelineMonths} activeBudgetMonth={finance.activeBudgetMonth} onSubmit={handleAddTransfer} onClose={() => setIsTransferOpen(false)} />
       )}
-
-      {/* Change Credentials Modal */}
-      {isChangePasswordOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 style={{fontSize:'1.5rem', fontWeight:'600'}}>Ubah Kredensial</h2>
-              <button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-primary)'}} onClick={() => setIsChangePasswordOpen(false)}><X size={24}/></button>
-            </div>
-            <form onSubmit={handleChangePassword}>
-              {changePasswordError && <div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>{changePasswordError}</div>}
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Kredensial Saat Ini</label>
-                <input type="password" name="currentPassword" className="form-input" required placeholder="Masukkan kredensial saat ini" />
-              </div>
-              <div style={{marginBottom:'1rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Kredensial Baru</label>
-                <input type="password" name="newPassword" className="form-input" required placeholder="Minimal 6 karakter" />
-              </div>
-              <div style={{marginBottom:'1.5rem'}}>
-                <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)'}}>Konfirmasi Kredensial Baru</label>
-                <input type="password" name="confirmPassword" className="form-input" required placeholder="Ulangi kredensial baru" />
-              </div>
-              <button type="submit" className="btn-primary" style={{width:'100%', color:'white'}}>Ubah Kredensial</button>
-            </form>
-          </div>
-        </div>
+      {!auth.isAdmin && isSettingsOpen && (
+        <SettingsModal
+          settingsTab={settingsTab} setSettingsTab={setSettingsTab}
+          baseTotalIncome={finance.baseTotalIncome} setBaseTotalIncome={finance.setBaseTotalIncome}
+          accounts={finance.accounts} setAccounts={finance.setAccounts}
+          categories={finance.categories} setCategories={finance.setCategories}
+          goals={finance.goals} setGoals={finance.setGoals}
+          sumOfAccounts={finance.sumOfAccounts} sumOfCategories={finance.sumOfCategories}
+          onSave={() => finance.saveSettings(() => setIsSettingsOpen(false))}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      )}
+      {finance.isEditOpen && finance.editingTransaction && (
+        <EditTransactionModal
+          editingTransaction={finance.editingTransaction}
+          accounts={finance.accounts} categories={finance.categories}
+          timelineMonths={finance.timelineMonths} activeBudgetMonth={finance.activeBudgetMonth}
+          onSubmit={finance.handleEditTransaction}
+          onClose={() => { finance.setIsEditOpen(false); finance.setEditingTransaction(null); }}
+        />
+      )}
+      {auth.isChangePasswordOpen && (
+        <ChangePasswordModal changePasswordError={auth.changePasswordError} onSubmit={auth.handleChangePassword} onClose={() => auth.setIsChangePasswordOpen(false)} />
       )}
 
       {/* Mobile Notification Panel */}
       {isMobile && isNotificationOpen && (
-        <>
-          <div className="notification-panel-overlay" onClick={() => setIsNotificationOpen(false)} />
-          <div className="notification-panel">
-            <div className="notification-panel-header">
-              <h3>Notifikasi</h3>
-              <button onClick={() => { setReadNotifications(new Set(notifications.map(n => n.id))); }}>Tandai semua dibaca</button>
-            </div>
-            {notifications.length === 0 ? <div className="notification-empty">Tidak ada notifikasi</div> : notifications.map(n => (
-              <div key={n.id} className={`notification-item ${readNotifications.has(n.id) ? '' : 'unread'}`} onClick={() => setReadNotifications(prev => new Set([...prev, n.id]))}>
-                <div className={`notification-icon ${n.type}`}><AlertTriangle size={18} /></div>
-                <div className="notification-content">
-                  <div className="notification-title">{n.title}</div>
-                  <div className="notification-desc">{n.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <NotificationPanel
+          notifications={finance.notifications}
+          readNotifications={readNotifications}
+          setReadNotifications={setReadNotifications}
+          onClose={() => setIsNotificationOpen(false)}
+        />
       )}
 
-      {/* Toast Container */}
-      {toasts.length > 0 && (
-        <div className="toast-container">
-          {toasts.map(toast => (
-            <ToastItem key={toast.id} toast={toast} onDismiss={removeToast} />
-          ))}
-        </div>
-      )}
+      {/* Toasts */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }
 
 export default App;
+

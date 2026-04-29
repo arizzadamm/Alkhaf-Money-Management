@@ -223,6 +223,57 @@ Deno.serve(async (req) => {
       return json({ data });
     }
 
+    if (action === 'auto_generate_income') {
+      if (!budgetMonth) return json({ error: 'budgetMonth wajib diisi.' }, 400);
+
+      const { data: userSettings } = await supabaseAdmin
+        .from('app_settings')
+        .select('total_income, accounts')
+        .eq('user_id', auth.user.id)
+        .maybeSingle();
+
+      if (!userSettings || !userSettings.total_income || Number(userSettings.total_income) <= 0) {
+        return json({ data: null });
+      }
+
+      const accountsList = Array.isArray(userSettings.accounts) ? userSettings.accounts : [];
+      if (accountsList.length === 0) return json({ data: null });
+
+      const { data: existing } = await supabaseAdmin
+        .from('expenses')
+        .select('id')
+        .eq('user_id', auth.user.id)
+        .eq('budget_month', String(budgetMonth))
+        .eq('category', 'Income')
+        .like('name', 'Gaji Bulanan%')
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) return json({ data: null });
+
+      const [y, mo] = String(budgetMonth).split('-');
+      const monthDate = new Date(Number(y), Number(mo) - 1, 1);
+      const dateStr = monthDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      const { data: created, error: createError } = await supabaseAdmin
+        .from('expenses')
+        .insert({
+          user_id: auth.user.id,
+          name: 'Gaji Bulanan',
+          amount: Number(userSettings.total_income),
+          account: String(accountsList[0]?.name || 'Default'),
+          category: 'Income',
+          is_paid: true,
+          date: dateStr,
+          budget_month: String(budgetMonth)
+        })
+        .select('*')
+        .single();
+
+      if (createError) return json({ error: createError.message }, 400);
+      return json({ data: created });
+    }
+
     if (action === 'update_transaction') {
       if (!transactionId || !updates || typeof updates !== 'object') {
         return json({ error: 'transactionId dan updates wajib diisi.' }, 400);
