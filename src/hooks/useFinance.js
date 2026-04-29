@@ -30,6 +30,9 @@ export function useFinance(user, addToast, getStoredSessionProof) {
   // Balance view toggle (monthly vs total)
   const [showTotalBalance, setShowTotalBalance] = useState(false);
 
+
+  // Billing cut-off date (1-28, default 1 = standard calendar month)
+  const [cutoffDate, setCutoffDate] = useState(1);
   // Undo delete
   const pendingDeleteRef = useRef(null);
 
@@ -42,10 +45,16 @@ export function useFinance(user, addToast, getStoredSessionProof) {
   const viewMonthName = getReferenceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
   const activeBudgetMonth = useMemo(() => {
-    const year = getReferenceDate.getFullYear();
-    const month = String(getReferenceDate.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
-  }, [getReferenceDate]);
+    const ref = getReferenceDate;
+    const day = ref.getDate();
+    let y = ref.getFullYear();
+    let m = ref.getMonth();
+    if (cutoffDate > 1 && day < cutoffDate) {
+      m -= 1;
+      if (m < 0) { m = 11; y -= 1; }
+    }
+    return `${y}-${String(m + 1).padStart(2, '0')}`;
+  }, [getReferenceDate, cutoffDate]);
 
   const timelineMonths = useMemo(() => {
     const result = [];
