@@ -56,13 +56,19 @@ export const TransactionsView = ({
 
         {/* Cashflow Summary Card */}
         <div className="mobile-cashflow-card">
-          <div className="mobile-cashflow-header" onClick={() => setShowChart(!showChart)}>
+          <button
+            type="button"
+            className="mobile-cashflow-header"
+            onClick={() => setShowChart(!showChart)}
+            aria-expanded={showChart}
+            aria-label="Toggle cashflow chart"
+          >
             <div className="mobile-cashflow-title-row">
               <BarChart3 size={18} />
               <span>Cashflow</span>
             </div>
             {showChart ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </div>
+          </button>
           <div className="mobile-cashflow-stats">
             <div className="mobile-cashflow-stat">
               <div className="mobile-cashflow-stat-icon income"><TrendingUp size={14} /></div>
@@ -128,6 +134,8 @@ export const TransactionsView = ({
             type="button"
             className={`mobile-filter-toggle-btn ${activeFilterCount > 0 ? 'has-filters' : ''}`}
             onClick={() => setShowFilters(!showFilters)}
+            aria-label="Toggle filters"
+            aria-expanded={showFilters}
           >
             <SlidersHorizontal size={16} />
             {activeFilterCount > 0 && <span className="mobile-filter-badge">{activeFilterCount}</span>}
@@ -201,9 +209,12 @@ export const TransactionsView = ({
           ) : (
             groupedTransactions.map((group) => (
               <div className="mobile-transaction-group" key={group.key}>
-                <div
+                <button
+                  type="button"
                   className="mobile-transaction-group-header"
                   onClick={() => setExpandedGroup(expandedGroup === group.key ? null : group.key)}
+                  aria-expanded={expandedGroup === group.key || expandedGroup === null}
+                  aria-label={`Toggle group ${group.label}`}
                 >
                   <div className="mobile-group-header-left">
                     <h3>{group.label}</h3>
@@ -216,7 +227,7 @@ export const TransactionsView = ({
                     </div>
                     {expandedGroup === group.key ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
-                </div>
+                </button>
                 {(expandedGroup === group.key || expandedGroup === null) && (
                   <div className="mobile-transaction-group-items">
                     {group.transactions.map((tx, i) => (
@@ -350,9 +361,9 @@ export const TransactionsView = ({
                 </button>
               ))}
             </div>
-            <button className="btn-primary" onClick={() => setIsTransferOpen(true)} style={{background:'var(--accent-blue-gray)', color: '#fff'}}><ArrowRightLeft size={16}/> Transfer</button>
-            <button className="btn-primary" onClick={() => setIsAddOpen(true)} style={{color: '#fff'}}><Plus size={16}/> Add Expense</button>
-            <button className="btn-primary" style={{background:'var(--success)', color: '#fff'}} onClick={() => setIsTopUpOpen(true)}><ArrowUpRight size={16}/> Top Up</button>
+            <button className="btn-primary" onClick={() => setIsTransferOpen(true)} style={{background:'var(--accent-blue-gray)'}}><ArrowRightLeft size={16}/> Transfer</button>
+            <button className="btn-primary" onClick={() => setIsAddOpen(true)}><Plus size={16}/> Add Expense</button>
+            <button className="btn-primary" style={{background:'var(--success)'}} onClick={() => setIsTopUpOpen(true)}><ArrowUpRight size={16}/> Top Up</button>
           </div>
         </div>
 
@@ -412,7 +423,7 @@ export const TransactionsView = ({
                         <td>{tx.account}</td>
                         <td>{tx.category}</td>
                         <td style={{textAlign:'right', color: tx.category === 'Income' || tx.category === 'Transfer In' ? 'var(--success)' : 'inherit'}}>{formatIDR(tx.amount)}</td>
-                        <td style={{textAlign:'right'}}><div style={{display:'inline-flex', gap:'0.35rem'}}><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent-blue-gray)'}} onClick={() => openEditTransaction(tx)}><Pencil size={16}/></button><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)'}} onClick={() => removeTransaction(tx.id)}><Trash2 size={18}/></button></div></td>
+                         <td style={{textAlign:'right'}}><div style={{display:'inline-flex', gap:'0.35rem'}}><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent-blue-gray)'}} onClick={() => openEditTransaction(tx)} aria-label={`Edit ${tx.name}`}><Pencil size={16}/></button><button style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)'}} onClick={() => removeTransaction(tx.id)} aria-label={`Delete ${tx.name}`}><Trash2 size={18}/></button></div></td>
                       </tr>
                     ))}
                   </tbody>

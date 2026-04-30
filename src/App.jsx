@@ -275,7 +275,18 @@ function App() {
       {isMobile ? (
         <>
           <main className="main-content">
-            <MobileHeader user={auth.user} isAdmin={auth.isAdmin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} setIsNotificationOpen={setIsNotificationOpen} searchQuery={finance.searchQuery} setSearchQuery={finance.setSearchQuery} setActiveView={setActiveView} />
+            <MobileHeader
+              user={auth.user}
+              isAdmin={auth.isAdmin}
+              isDarkMode={isDarkMode}
+              toggleTheme={toggleTheme}
+              setIsNotificationOpen={setIsNotificationOpen}
+              notifications={finance.notifications}
+              readNotifications={readNotifications}
+              searchQuery={finance.searchQuery}
+              setSearchQuery={finance.setSearchQuery}
+              setActiveView={setActiveView}
+            />
             {renderActiveView()}
           </main>
           <MobileBottomNav

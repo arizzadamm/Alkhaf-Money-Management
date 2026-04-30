@@ -10,7 +10,7 @@ export const TelegramProfilePanel = ({
   <div className="widget-card telegram-profile-card">
     <div className="widget-header" style={{marginBottom:'1rem'}}>
       <span className="widget-title">Telegram Integration</span>
-      <button type="button" className="btn-primary" onClick={fetchTelegramConnections} disabled={isTelegramLoading} style={{color:'white'}}>
+      <button type="button" className="btn-primary" onClick={fetchTelegramConnections} disabled={isTelegramLoading}>
         Refresh
       </button>
     </div>
@@ -22,7 +22,7 @@ export const TelegramProfilePanel = ({
           Generate token lalu scan QR untuk menghubungkan akun Telegram Anda.
         </div>
       </div>
-      <button type="button" className="btn-primary" onClick={generateTelegramLinkToken} disabled={isTelegramLoading} style={{color:'white'}}>
+      <button type="button" className="btn-primary" onClick={generateTelegramLinkToken} disabled={isTelegramLoading}>
         {isTelegramLoading ? 'Memproses...' : 'Generate Token'}
       </button>
     </div>
@@ -34,7 +34,7 @@ export const TelegramProfilePanel = ({
     )}
 
     {telegramSuccess && (
-      <div style={{background:'rgba(16,185,129,0.12)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
+      <div style={{background:'var(--success-light)', color:'var(--success)', padding:'0.75rem', borderRadius:'10px', marginBottom:'1rem'}}>
         {telegramSuccess}
       </div>
     )}
@@ -106,7 +106,7 @@ export const TelegramProfilePanel = ({
             </div>
             <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap', justifyContent:'flex-end'}}>
               {!connection.is_primary && (
-                <button type="button" className="btn-primary" style={{color:'white', padding:'0.65rem 0.9rem'}} onClick={() => setPrimaryTelegramConnection(connection.id)}>
+                <button type="button" className="btn-primary" style={{padding:'0.65rem 0.9rem'}} onClick={() => setPrimaryTelegramConnection(connection.id)}>
                   Jadikan Primary
                 </button>
               )}
@@ -125,14 +125,14 @@ export const ProfileView = ({ isMobile, user, handleLogout, telegramProps, onCha
   return (
     <div style={{display:'flex', flexDirection:'column', gap: isMobile ? '1rem' : '1.5rem', maxWidth: isMobile ? undefined : '860px', margin: isMobile ? undefined : '0 auto', paddingBottom: isMobile ? '6rem' : undefined}}>
       <div className="widget-card" style={{textAlign:'center', padding: isMobile ? '1.5rem' : '3rem'}}>
-        <div style={{width:'72px', height:'72px', borderRadius:'50%', background:'var(--accent-lime)', color:'#0f172a', display:'grid', placeContent:'center', fontWeight:'800', fontSize:'1.8rem', margin:'0 auto 1rem'}}>
+        <div style={{width:'72px', height:'72px', borderRadius:'50%', background:'var(--accent-lime)', color:'var(--text-on-accent)', display:'grid', placeContent:'center', fontWeight:'800', fontSize:'1.8rem', margin:'0 auto 1rem'}}>
           {user.name ? user.name.charAt(0).toUpperCase() : '?'}
         </div>
         <h2 style={{fontSize:'1.8rem', fontWeight:'700'}}>{user.name}</h2>
         <div style={{marginTop:'0.75rem', color:'var(--text-secondary)', textTransform:'capitalize'}}>{user.role}</div>
         <div style={{display:'flex', gap:'0.75rem', justifyContent:'center', marginTop:'2rem', flexWrap:'wrap'}}>
           {onChangePassword && (
-            <button className="btn-primary" onClick={onChangePassword} style={{color:'white', background:'var(--accent-blue-gray)'}}>
+            <button className="btn-primary" onClick={onChangePassword} style={{background:'var(--accent-blue-gray)'}}>
               <KeyRound size={18}/> Ubah Password
             </button>
           )}

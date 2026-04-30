@@ -16,7 +16,7 @@ export const ToastItem = ({ toast, onDismiss }) => {
             {toast.actionLabel}
           </button>
         )}
-        <button className="toast-close-btn" onClick={() => onDismiss(toast.id)}>
+        <button className="toast-close-btn" onClick={() => onDismiss(toast.id)} aria-label="Dismiss notification">
           <X size={16} />
         </button>
       </div>

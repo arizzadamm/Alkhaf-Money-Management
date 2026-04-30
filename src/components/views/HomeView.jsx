@@ -9,7 +9,7 @@ export const HomeView = ({
   isMobile,
   accounts, categories, goals,
   filteredTransactions,
-  totalBalance, monthlyBalance, displayBalance, displayBalanceLabel, showTotalBalance, setShowTotalBalance, currentAccountBalances,
+  displayBalance, displayBalanceLabel, showTotalBalance, setShowTotalBalance, currentAccountBalances,
   effectiveTotalIncome, totals, donutChartData,
   usagePercentage, timelineMonths, monthOffset, setMonthOffset,
   quickAddGoalFund,
@@ -59,29 +59,29 @@ export const HomeView = ({
           <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
             {/* Quick Actions — fixed icons & labels */}
             <div className="mobile-actions-row">
-              <div className="mobile-action-item" onClick={() => setIsTopUpOpen(true)}>
+              <button type="button" className="mobile-action-item" onClick={() => setIsTopUpOpen(true)}>
                 <div className="mobile-action-squircle"><ArrowUpRight size={24} color="var(--success)"/></div><span>Top Up</span>
-              </div>
-              <div className="mobile-action-item" onClick={() => setIsAddOpen(true)}>
+              </button>
+              <button type="button" className="mobile-action-item" onClick={() => setIsAddOpen(true)}>
                 <div className="mobile-action-squircle"><Plus size={24} color="var(--accent-dark-green)"/></div><span>Expense</span>
-              </div>
-              <div className="mobile-action-item" onClick={() => setIsTransferOpen(true)}>
+              </button>
+              <button type="button" className="mobile-action-item" onClick={() => setIsTransferOpen(true)}>
                 <div className="mobile-action-squircle"><ArrowRightLeft size={24} color="var(--accent-blue-gray)"/></div><span>Transfer</span>
-              </div>
-              <div className="mobile-action-item" onClick={exportToCSV}>
+              </button>
+              <button type="button" className="mobile-action-item" onClick={exportToCSV}>
                 <div className="mobile-action-squircle"><Download size={24} color="var(--text-primary)"/></div><span>Export</span>
-              </div>
+              </button>
             </div>
 
             {/* Promo Banner — navigates to Profile/Telegram */}
-            <div className="promo-banner" onClick={() => setActiveView('profile')} style={{cursor:'pointer'}}>
+            <button type="button" className="promo-banner" onClick={() => setActiveView('profile')}>
               <div className="promo-icon"><CreditCard size={20} color="white"/></div>
               <div>
                 <div className="promo-title">Telegram Auto Tracking</div>
                 <div className="promo-subtitle">Track your finances as easily as sending a message.</div>
               </div>
               <div className="promo-arrow"><ChevronRight size={20}/></div>
-            </div>
+            </button>
 
             {/* Timeline */}
             <div style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'1.5rem', color:'white', marginTop:'1rem'}}>
@@ -90,12 +90,12 @@ export const HomeView = ({
                  {timelineMonths.map((item, i) => {
                     const isCurrent = item.offset === monthOffset;
                     return (
-                      <div key={`month-${i}`} onClick={() => setMonthOffset(item.offset)} style={{
-                        padding:'0.5rem 1rem', background: isCurrent ? 'var(--accent-lime)' : 'rgba(255,255,255,0.08)',
-                        borderRadius: '20px', color: isCurrent ? '#0f172a' : 'white', fontWeight: isCurrent ? '600' : '400', cursor:'pointer'
-                      }}>{item.label}</div>
-                    )
-                 })}
+                       <button type="button" key={`month-${i}`} onClick={() => setMonthOffset(item.offset)} style={{
+                         padding:'0.5rem 1rem', background: isCurrent ? 'var(--accent-lime)' : 'rgba(255,255,255,0.08)',
+                         borderRadius: '20px', color: isCurrent ? 'var(--text-on-accent)' : 'white', fontWeight: isCurrent ? '600' : '400', cursor:'pointer', border:'none'
+                       }}>{item.label}</button>
+                     )
+                  })}
                </div>
             </div>
 
@@ -241,14 +241,14 @@ export const HomeView = ({
           <h2 className="hero-card-title">Your Financial Flow</h2>
           <p className="hero-card-subtitle">Track income and expenses automatically from Telegram.</p>
         </div>
-        <div className="hero-card-metric" style={{cursor:'pointer'}} onClick={() => setShowTotalBalance(!showTotalBalance)}>
+        <button type="button" className="hero-card-metric" style={{cursor:'pointer'}} onClick={() => setShowTotalBalance(!showTotalBalance)} aria-label="Toggle balance scope">
           <div style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
             <div className="hero-card-metric-label">{displayBalanceLabel}</div>
             <span style={{background:'rgba(255,255,255,0.15)', borderRadius:'999px', padding:'0.15rem 0.5rem', fontSize:'0.7rem', fontWeight:'600'}}>{showTotalBalance ? 'Bulan Ini' : 'Total'}</span>
           </div>
           <div className="hero-card-metric-value">{formatIDR(displayBalance)}</div>
           <div className="hero-card-metric-trend">{showTotalBalance ? 'Kumulatif semua bulan' : 'Income - Expense bulan ini'}</div>
-        </div>
+        </button>
       </div>
 
       <div className="money-overview-card" style={{background:'var(--accent-dark-green)', borderRadius:'var(--border-radius-lg)', padding:'2rem', color:'white', marginBottom:'1.5rem', display:'flex', gap:'2rem', alignItems:'center', flexWrap:'wrap'}}>
@@ -260,13 +260,13 @@ export const HomeView = ({
            {timelineMonths.map((item, i) => {
               const isCurrent = item.offset === monthOffset;
               return (
-                <div key={`month-${i}`} onClick={() => setMonthOffset(item.offset)} style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'0.5rem', cursor: 'pointer'}}>
+                <button type="button" key={`month-${i}`} onClick={() => setMonthOffset(item.offset)} style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'0.5rem', cursor: 'pointer', border:'none', background:'transparent'}}>
                   <div style={{
                     width: isCurrent ? '80px' : '50px', height: '40px', background: isCurrent ? 'var(--accent-lime)' : 'rgba(255,255,255,0.08)',
-                    borderRadius: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: isCurrent ? '#0f172a' : 'white', fontWeight: isCurrent ? '600' : '400', transition: 'all 0.3s ease'
+                    borderRadius: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: isCurrent ? 'var(--text-on-accent)' : 'white', fontWeight: isCurrent ? '600' : '400', transition: 'all 0.3s ease'
                   }}>{isCurrent ? `${usagePercentage}%` : ''}</div>
                   <span style={{ fontSize:'0.8rem', opacity: isCurrent ? 1 : 0.6, fontWeight: isCurrent ? '600' : '400', color: isCurrent ? 'var(--accent-lime)' : 'white' }}>{item.label}</span>
-                </div>
+                </button>
               )
            })}
          </div>
@@ -322,7 +322,7 @@ export const HomeView = ({
             <div className="widget-card">
               <div className="widget-header">
                 <span className="widget-title">Recent Transactions</span>
-                <a href="#" className="see-all" onClick={(e) => {e.preventDefault(); setActiveView('transactions');}}>See all ›</a>
+                <button type="button" className="see-all" style={{background:'none', border:'none'}} onClick={() => setActiveView('transactions')}>See all ›</button>
               </div>
               <div className="transaction-list">
                 {filteredTransactions.length === 0 && <span style={{color:'var(--text-secondary)'}}>No transactions found.</span>}

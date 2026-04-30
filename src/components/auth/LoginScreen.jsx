@@ -25,12 +25,12 @@ export const LoginScreen = ({ loginError, rememberMe, setRememberMe, handleLogin
           <form onSubmit={handleLogin}>
             {loginError && (<div style={{background:'var(--danger-light)', color:'var(--danger)', padding:'0.75rem', borderRadius:'8px', marginBottom:'1rem', fontSize:'0.9rem', fontWeight:'500'}}>{loginError}</div>)}
             <div style={{marginBottom:'1.5rem', textAlign:'left'}}>
-              <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Username</label>
-              <input type="text" name="username" required className="form-input login-input" placeholder="Enter username" />
+              <label htmlFor="login-username" style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Username</label>
+              <input id="login-username" type="text" name="username" required className="form-input login-input" placeholder="Enter username" autoComplete="username" />
             </div>
             <div style={{marginBottom:'2rem', textAlign:'left'}}>
-              <label style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Password</label>
-              <input type="password" name="password" required className="form-input login-input" placeholder="••••••••" />
+              <label htmlFor="login-password" style={{display:'block', marginBottom:'0.5rem', color:'var(--text-secondary)', fontSize:'0.9rem'}}>Password</label>
+              <input id="login-password" type="password" name="password" required className="form-input login-input" placeholder="••••••••" autoComplete="current-password" />
             </div>
             <label className="login-remember">
               <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />

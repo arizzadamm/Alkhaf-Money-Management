@@ -7,40 +7,65 @@ export const MobileBottomNav = ({
   setIsAddOpen, setIsSettingsOpen,
 }) => {
   return (
-    <div className="mobile-bottom-nav">
+    <nav className="mobile-bottom-nav" aria-label="Main navigation">
       {isAdmin ? (
         <>
-          <div className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}>
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`}
+            onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}
+            aria-current={activeView === 'admin' ? 'page' : undefined}
+          >
             <Users size={24} /> <span>Users</span>
-          </div>
-          <div className="mobile-nav-fab" onClick={handleLogout}>
-             <LogOut size={24} color="#0f172a" />
-          </div>
-          <div className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`} onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}>
+          </button>
+          <button type="button" className="mobile-nav-fab" onClick={handleLogout} aria-label="Logout">
+             <LogOut size={24} color="var(--text-on-accent)" />
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeView === 'admin' ? 'active' : ''}`}
+            onClick={() => { setActiveView('admin'); fetchAdminUsers(); }}
+            aria-current={activeView === 'admin' ? 'page' : undefined}
+          >
             <Settings size={24} /> <span>Admin</span>
-          </div>
+          </button>
         </>
       ) : (
         <>
-          <div className={`mobile-nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}>
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeView === 'home' ? 'active' : ''}`}
+            onClick={() => setActiveView('home')}
+            aria-current={activeView === 'home' ? 'page' : undefined}
+          >
             <Home size={24} /> <span>Home</span>
-          </div>
-          <div className={`mobile-nav-item ${activeView === 'transactions' ? 'active' : ''}`} onClick={() => setActiveView('transactions')}>
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeView === 'transactions' ? 'active' : ''}`}
+            onClick={() => setActiveView('transactions')}
+            aria-current={activeView === 'transactions' ? 'page' : undefined}
+          >
             <ArrowRightLeft size={24} /> <span>Trans</span>
-          </div>
+          </button>
 
-          <div className="mobile-nav-fab" onClick={() => setIsAddOpen(true)}>
-             <Plus size={26} color="#0f172a" />
-          </div>
+          <button type="button" className="mobile-nav-fab" onClick={() => setIsAddOpen(true)} aria-label="Quick add expense">
+             <Plus size={26} color="var(--text-on-accent)" />
+          </button>
 
-          <div className={`mobile-nav-item`} onClick={() => setIsSettingsOpen(true)}>
+          <button type="button" className="mobile-nav-item" onClick={() => setIsSettingsOpen(true)} aria-label="Open cards settings">
             <CreditCard size={24} /> <span>Cards</span>
-          </div>
-          <div className={`mobile-nav-item ${activeView === 'profile' ? 'active' : ''}`} onClick={() => setActiveView('profile')}>
+          </button>
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeView === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveView('profile')}
+            aria-current={activeView === 'profile' ? 'page' : undefined}
+          >
             <User size={24} /> <span>Profile</span>
-          </div>
+          </button>
         </>
       )}
-    </div>
+    </nav>
   );
 };

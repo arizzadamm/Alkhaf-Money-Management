@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Bell, Moon, Sun, Search, X } from 'lucide-react';
 import { getInitial } from '../../utils/formatters';
 
-export const MobileHeader = ({ user, isAdmin, isDarkMode, toggleTheme, setIsNotificationOpen, searchQuery, setSearchQuery, setActiveView }) => {
+export const MobileHeader = ({ user, isAdmin, isDarkMode, toggleTheme, setIsNotificationOpen, notifications, readNotifications, searchQuery, setSearchQuery, setActiveView }) => {
   const [showSearch, setShowSearch] = useState(false);
+  const unreadCount = (notifications || []).filter(n => !readNotifications?.has(n.id)).length;
 
   return (
     <div className="mobile-header">
@@ -20,6 +21,7 @@ export const MobileHeader = ({ user, isAdmin, isDarkMode, toggleTheme, setIsNoti
           <button
             style={{background:'none', border:'none', cursor:'pointer', padding:'0.25rem'}}
             onClick={() => { setShowSearch(false); if (setSearchQuery) setSearchQuery(''); }}
+            aria-label="Close search"
           >
             <X size={18} color="var(--text-secondary)" />
           </button>
@@ -36,19 +38,19 @@ export const MobileHeader = ({ user, isAdmin, isDarkMode, toggleTheme, setIsNoti
           </div>
           <div style={{display:'flex', gap:'0.5rem'}}>
              {!isAdmin && (
-               <button style={{background:'var(--bg-card)', border:'none', width:'48px', height:'48px', borderRadius:'50%', display:'grid', placeContent:'center'}} onClick={() => setShowSearch(true)}>
-                 <Search size={20} color="var(--text-primary)"/>
-               </button>
-             )}
-             <button style={{background:'var(--bg-card)', border:'none', width:'48px', height:'48px', borderRadius:'50%', display:'grid', placeContent:'center'}} onClick={toggleTheme}>
-               {isDarkMode ? <Sun size={20} color="var(--text-primary)"/> : <Moon size={20} color="var(--text-primary)"/>}
-             </button>
-             {!isAdmin && (
-               <button className="mobile-bell" onClick={() => setIsNotificationOpen(true)}>
-                 <Bell size={20} color="var(--text-primary)"/>
-                 <span className="notification-dot"></span>
-               </button>
-             )}
+               <button style={{background:'var(--bg-card)', border:'none', width:'48px', height:'48px', borderRadius:'50%', display:'grid', placeContent:'center'}} onClick={() => setShowSearch(true)} aria-label="Open transaction search">
+                  <Search size={20} color="var(--text-primary)"/>
+                </button>
+              )}
+              <button style={{background:'var(--bg-card)', border:'none', width:'48px', height:'48px', borderRadius:'50%', display:'grid', placeContent:'center'}} onClick={toggleTheme} aria-label="Toggle theme">
+                {isDarkMode ? <Sun size={20} color="var(--text-primary)"/> : <Moon size={20} color="var(--text-primary)"/>}
+              </button>
+              {!isAdmin && (
+                <button className="mobile-bell" onClick={() => setIsNotificationOpen(true)} aria-label="Open notifications">
+                  <Bell size={20} color="var(--text-primary)"/>
+                  {unreadCount > 0 && <span className="notification-dot"></span>}
+                </button>
+              )}
           </div>
         </>
       )}

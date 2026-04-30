@@ -16,7 +16,7 @@ export const TopBar = ({
         {activeView === 'profile' && `Your Account`}
       </div>
       <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
-        <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={toggleTheme}>
+        <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={toggleTheme} aria-label="Toggle theme">
           {isDarkMode ? <Sun size={20}/> : <Moon size={20}/>}
         </button>
         {!isAdmin && (
@@ -25,7 +25,7 @@ export const TopBar = ({
               <Search size={18} color="var(--text-secondary)"/>
               <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => {setSearchQuery(e.target.value); if(activeView!=='transactions') setActiveView('transactions');}}/>
             </div>
-            <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={() => setIsSettingsOpen(true)}>
+            <button style={{background:'var(--bg-card)', border:'none', padding:'0.75rem', borderRadius:'50%', cursor:'pointer'}} onClick={() => setIsSettingsOpen(true)} aria-label="Open settings">
               <Settings size={20} />
             </button>
           </>
